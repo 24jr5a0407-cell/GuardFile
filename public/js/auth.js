@@ -115,6 +115,7 @@ function clearSession() {
  * Initializes and checks session on app load.
  */
 async function initAuth() {
+  initServiceWorker();
   const token = getToken();
   if (!token) {
     showAuthPortal();
@@ -856,6 +857,7 @@ function startUserApprovalPolling() {
           pillEl.textContent = 'Code Sent to Your Email!';
         }
         showToast('Code Ready!', `The Administrator has dispatched your code to ${target.email}.`, 'success');
+        triggerDeviceNotification('GuardFile: Access Code Ready!', `The Administrator has dispatched your Authorization Code to ${target.email}.`);
         const codeInput = document.getElementById('portal-admin-code-input');
         if (codeInput) {
           codeInput.focus();
@@ -1008,15 +1010,117 @@ async function checkAdminApprovalStatus(silent = false) {
 }
 
 /**
- * Google Social Auth Flow
+ * Google Social Auth Flow & Dynamic Account Management
  */
 function handleGoogleSignIn() {
   openGoogleModal();
 }
 
+function getGoogleAccounts() {
+  const defaults = [
+    { email: '24jr5a0407@gmail.com', name: 'MD Arshad' },
+    { email: 'kiddocabspace@gmail.com', name: 'Arshad User' },
+    { email: 'guradfile@gmail.com', name: 'GuardFile Security' },
+    { email: 'sarah.connor@guardfile.io', name: 'Sarah Connor' },
+  ];
+  try {
+    const stored = localStorage.getItem('guardfile_google_accounts');
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        const emails = new Set(parsed.map(a => a.email.toLowerCase()));
+        defaults.forEach(d => {
+          if (!emails.has(d.email.toLowerCase())) parsed.push(d);
+        });
+        return parsed;
+      }
+    }
+  } catch (e) {}
+  return defaults;
+}
+
+function renderGoogleAccountsList() {
+  const listEl = document.getElementById('google-accounts-list');
+  if (!listEl) return;
+  const accounts = getGoogleAccounts();
+  const colors = ['bg-blue-600', 'bg-purple-600', 'bg-emerald-600', 'bg-amber-600', 'bg-indigo-600'];
+
+  listEl.innerHTML = accounts.map((acc, idx) => {
+    const displayName = acc.name || acc.email.split('@')[0];
+    const initials = displayName
+      .split(' ')
+      .map(p => p[0])
+      .join('')
+      .substring(0, 2)
+      .toUpperCase();
+    const color = colors[idx % colors.length];
+
+    return `
+      <button
+        type="button"
+        onclick="executeGoogleAuth('${acc.email}', '${displayName}')"
+        class="w-full p-2.5 rounded-2xl border border-slate-200 hover:border-blue-400 hover:bg-blue-50/40 flex items-center gap-3 transition text-left cursor-pointer group"
+      >
+        <div class="w-8 h-8 rounded-full ${color} text-white font-bold flex items-center justify-center text-xs shadow-xs shrink-0">
+          ${initials}
+        </div>
+        <div class="flex-1 min-w-0">
+          <p class="text-xs font-bold text-slate-900 truncate">${displayName}</p>
+          <p class="text-[11px] text-slate-500 truncate font-mono">${acc.email}</p>
+        </div>
+        <i data-lucide="shield-check" class="w-4 h-4 text-blue-600 opacity-0 group-hover:opacity-100 transition shrink-0"></i>
+      </button>
+    `;
+  }).join('');
+
+  if (window.lucide) lucide.createIcons();
+}
+
+function toggleGoogleCustomAccountForm(show) {
+  const form = document.getElementById('google-custom-account-form');
+  const btn = document.getElementById('btn-google-use-another');
+  const shouldShow = show !== undefined ? show : (form && form.classList.contains('hidden'));
+  if (form) {
+    if (shouldShow) {
+      form.classList.remove('hidden');
+      form.classList.add('flex');
+      if (btn) btn.classList.add('hidden');
+      const emailInput = document.getElementById('google-custom-email');
+      if (emailInput) setTimeout(() => emailInput.focus(), 100);
+    } else {
+      form.classList.add('hidden');
+      form.classList.remove('flex');
+      if (btn) btn.classList.remove('hidden');
+    }
+  }
+}
+
+function handleGoogleCustomAccountSubmit(e) {
+  if (e && e.preventDefault) e.preventDefault();
+  const emailInput = document.getElementById('google-custom-email');
+  const nameInput = document.getElementById('google-custom-name');
+  if (!emailInput || !emailInput.value.trim()) return;
+
+  const email = emailInput.value.trim().toLowerCase();
+  const name = nameInput && nameInput.value.trim() ? nameInput.value.trim() : email.split('@')[0];
+
+  // Store in recent Google accounts for future one-click access
+  try {
+    const accounts = getGoogleAccounts();
+    if (!accounts.some(a => a.email.toLowerCase() === email)) {
+      accounts.unshift({ email, name });
+      localStorage.setItem('guardfile_google_accounts', JSON.stringify(accounts.slice(0, 8)));
+    }
+  } catch (err) {}
+
+  executeGoogleAuth(email, name);
+}
+
 function openGoogleModal() {
   const modal = document.getElementById('modal-google-auth');
   if (modal) {
+    renderGoogleAccountsList();
+    toggleGoogleCustomAccountForm(false);
     modal.classList.remove('hidden');
     modal.style.setProperty('display', 'flex', 'important');
   }
@@ -1061,16 +1165,134 @@ async function executeGoogleAuth(email, name, phone) {
       return;
     }
 
+    // Save active Google account to remembered accounts
+    try {
+      const accounts = getGoogleAccounts();
+      if (!accounts.some(a => a.email.toLowerCase() === email.toLowerCase())) {
+        accounts.unshift({ email: email.toLowerCase(), name: name.trim() });
+        localStorage.setItem('guardfile_google_accounts', JSON.stringify(accounts.slice(0, 8)));
+      }
+    } catch (e) {}
+
     setToken(data.token);
     currentUser = data.user;
     showDashboard();
     renderAuthHeader();
-    showToast('Google Authenticated', `Welcome, ${currentUser.name}!`, 'success');
+    showToast('Google Authenticated', `Welcome, ${currentUser.name}! (Document Owner)`, 'success');
+    triggerDeviceNotification('Welcome to GuardFile!', `Authenticated via Google as ${currentUser.name}.`);
     if (typeof loadDocuments === 'function') loadDocuments();
     if (typeof updateStats === 'function') updateStats();
   } catch (err) {
     showToast('Google Sign-In Error', err.message, 'error');
   }
+}
+
+/**
+ * Web Audio Chime Notification Helper
+ */
+function playNotificationSound() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
+    osc.frequency.setValueAtTime(783.99, ctx.currentTime + 0.12); // G5
+    gain.gain.setValueAtTime(0.12, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.35);
+  } catch (e) {}
+}
+
+/**
+ * Native OS / Desktop Notification Dispatcher
+ */
+async function triggerDeviceNotification(title, body, tag = 'guardfile') {
+  playNotificationSound();
+  if (!('Notification' in window)) return;
+  if (Notification.permission === 'granted') {
+    try {
+      if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+        const reg = await navigator.serviceWorker.ready;
+        reg.showNotification(title, {
+          body,
+          icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%232563eb"><path d="M12 2L3 7v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-9-5z"/></svg>',
+          badge: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%232563eb"><path d="M12 2L3 7v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-9-5z"/></svg>',
+          vibrate: [200, 100, 200],
+          tag,
+          requireInteraction: true,
+        });
+        return;
+      }
+    } catch (e) {}
+    try {
+      new Notification(title, {
+        body,
+        icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%232563eb"><path d="M12 2L3 7v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-9-5z"/></svg>',
+        tag,
+      });
+    } catch (e) {}
+  }
+}
+
+/**
+ * Toggle / Request Desktop Notification Permissions
+ */
+async function toggleDesktopNotifications() {
+  if (!('Notification' in window)) {
+    showToast('Not Supported', 'Desktop notifications are not supported by this browser.', 'warning');
+    return;
+  }
+
+  if (Notification.permission === 'granted') {
+    showToast('Notifications Active', 'Desktop notifications are active on this device.', 'info');
+    triggerDeviceNotification('GuardFile Notifications Active', 'You are ready to receive real-time alerts even when minimized.');
+    updateNotificationPermissionUI();
+    return;
+  }
+
+  if (Notification.permission === 'denied') {
+    showToast('Notifications Blocked', 'Please click the lock/tune icon near your browser address bar and set Notifications to "Allow".', 'warning');
+    return;
+  }
+
+  try {
+    const permission = await Notification.requestPermission();
+    if (permission === 'granted') {
+      showToast('Notifications Enabled!', 'You will now receive security alerts when codes and approvals are issued.', 'success');
+      triggerDeviceNotification('GuardFile Notifications Enabled', 'You will receive real-time alerts when approvals or access codes arrive.');
+    } else {
+      showToast('Notifications Denied', 'Desktop notifications were not enabled.', 'info');
+    }
+  } catch (err) {
+    console.error('Notification request error:', err);
+  }
+  updateNotificationPermissionUI();
+}
+
+function updateNotificationPermissionUI() {
+  const dot = document.getElementById('notif-permission-dot');
+  if (dot) {
+    if ('Notification' in window && Notification.permission === 'granted') {
+      dot.classList.remove('hidden');
+    } else {
+      dot.classList.add('hidden');
+    }
+  }
+}
+
+function initServiceWorker() {
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js').then((reg) => {
+      console.log('[ServiceWorker] Active with scope:', reg.scope);
+    }).catch((err) => {
+      console.warn('[ServiceWorker] Registration notice:', err.message);
+    });
+  }
+  updateNotificationPermissionUI();
 }
 
 /**
@@ -1154,6 +1376,7 @@ async function loadPendingApprovalsCount() {
     // Notify admin if new users just arrived
     if (previousPendingCount !== -1 && count > previousPendingCount) {
       showToast('New User Awaiting Approval!', `${count} user(s) verified OTP and are waiting for your Authorization Code.`, 'info');
+      triggerDeviceNotification('GuardFile: User Awaiting Approval', `${count} user(s) verified OTP and are waiting for your Authorization Code.`, 'admin-pending-approval');
       const approvalsView = document.getElementById('view-approvals');
       if (approvalsView && !approvalsView.classList.contains('hidden')) {
         loadPendingApprovals();

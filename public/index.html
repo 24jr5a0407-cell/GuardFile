@@ -55,12 +55,25 @@
         </div>
       </div>
 
-      <!-- User Session Pill & Actions -->
-      <div class="flex items-center gap-3" id="auth-header-container">
-        <!-- Rendered dynamically by auth.js -->
-        <button onclick="showPortalAuthTab('login'); window.scrollTo({top: 0, behavior: 'smooth'});" class="px-4 py-2 text-xs font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 shadow-sm transition">
-          Sign In
+      <!-- Device Push Notification Bell & User Session Actions -->
+      <div class="flex items-center gap-2.5">
+        <button
+          type="button"
+          id="btn-desktop-notif"
+          onclick="toggleDesktopNotifications()"
+          class="relative p-2 rounded-xl text-slate-600 hover:text-blue-600 hover:bg-blue-50 border border-slate-200 shadow-xs transition flex items-center justify-center cursor-pointer"
+          title="Enable Desktop / Device Notifications"
+        >
+          <i data-lucide="bell" class="w-4 h-4"></i>
+          <span id="notif-permission-dot" class="absolute top-1 right-1 w-2 h-2 rounded-full bg-emerald-500 hidden"></span>
         </button>
+
+        <div class="flex items-center gap-3" id="auth-header-container">
+          <!-- Rendered dynamically by auth.js -->
+          <button onclick="showPortalAuthTab('login'); window.scrollTo({top: 0, behavior: 'smooth'});" class="px-4 py-2 text-xs font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 shadow-sm transition">
+            Sign In
+          </button>
+        </div>
       </div>
     </div>
   </header>
@@ -842,33 +855,70 @@
         <p class="text-xs text-slate-500 mt-0.5">to continue to <span class="font-bold text-slate-700">GuardFile</span></p>
       </div>
 
-      <!-- Account options -->
-      <div class="flex flex-col gap-2">
-        <button type="button" onclick="executeGoogleAuth('24jr5a0407@gmail.com', 'MD Arshad', '+91 9876543210')" class="w-full p-3 rounded-2xl border border-slate-200 hover:border-blue-400 hover:bg-blue-50/40 flex items-center gap-3 transition text-left cursor-pointer group">
-          <div class="w-9 h-9 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center text-xs shadow-xs">
-            MA
+      <!-- Dynamic Google Accounts List -->
+      <div id="google-accounts-list" class="flex flex-col gap-2 max-h-56 overflow-y-auto pr-0.5">
+        <!-- Rendered dynamically by renderGoogleAccountsList() in auth.js -->
+      </div>
+
+      <!-- Use Another Account Option -->
+      <div>
+        <button
+          type="button"
+          id="btn-google-use-another"
+          onclick="toggleGoogleCustomAccountForm()"
+          class="w-full p-2.5 rounded-2xl border border-dashed border-slate-300 hover:border-blue-400 hover:bg-blue-50/30 flex items-center gap-3 transition text-left cursor-pointer"
+        >
+          <div class="w-8 h-8 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center text-xs">
+            <i data-lucide="user-plus" class="w-4 h-4"></i>
           </div>
-          <div class="flex-1 min-w-0">
-            <p class="text-xs font-bold text-slate-900 truncate">MD Arshad</p>
-            <p class="text-[11px] text-slate-500 truncate">24jr5a0407@gmail.com</p>
-          </div>
-          <i data-lucide="shield-check" class="w-4 h-4 text-blue-600 opacity-0 group-hover:opacity-100 transition"></i>
+          <span class="text-xs font-semibold text-slate-700">Use another Google account</span>
         </button>
 
-        <button type="button" onclick="executeGoogleAuth('sarah.connor@guardfile.io', 'Sarah Connor', '+1 555 019 9283')" class="w-full p-3 rounded-2xl border border-slate-200 hover:border-blue-400 hover:bg-blue-50/40 flex items-center gap-3 transition text-left cursor-pointer group">
-          <div class="w-9 h-9 rounded-full bg-purple-600 text-white font-bold flex items-center justify-center text-xs shadow-xs">
-            SC
+        <!-- Custom Account Input Form -->
+        <form
+          id="google-custom-account-form"
+          onsubmit="handleGoogleCustomAccountSubmit(event); return false;"
+          class="hidden flex-col gap-2.5 p-3 mt-2 rounded-2xl bg-slate-50 border border-slate-200"
+        >
+          <div>
+            <label class="block text-[11px] font-semibold text-slate-700 mb-1">Google Email Address</label>
+            <input
+              type="email"
+              id="google-custom-email"
+              required
+              placeholder="e.g. you@gmail.com"
+              class="w-full text-xs px-3 py-2 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+            />
           </div>
-          <div class="flex-1 min-w-0">
-            <p class="text-xs font-bold text-slate-900 truncate">Sarah Connor</p>
-            <p class="text-[11px] text-slate-500 truncate">sarah.connor@guardfile.io</p>
+          <div>
+            <label class="block text-[11px] font-semibold text-slate-700 mb-1">Your Full Name (Optional)</label>
+            <input
+              type="text"
+              id="google-custom-name"
+              placeholder="e.g. John Doe"
+              class="w-full text-xs px-3 py-2 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+            />
           </div>
-          <i data-lucide="shield-check" class="w-4 h-4 text-purple-600 opacity-0 group-hover:opacity-100 transition"></i>
-        </button>
+          <div class="flex items-center gap-2 pt-1">
+            <button
+              type="submit"
+              class="flex-1 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition cursor-pointer"
+            >
+              Sign In with this Account
+            </button>
+            <button
+              type="button"
+              onclick="toggleGoogleCustomAccountForm(false)"
+              class="px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded-xl transition cursor-pointer"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
       </div>
 
       <div class="pt-2 border-t border-slate-100 text-center">
-        <p class="text-[11px] text-slate-400">Zero-Trust Google OAuth 2.0 simulation with immutable cryptographic ledger verification.</p>
+        <p class="text-[10px] text-slate-400">Zero-Trust Google OAuth 2.0 with instant verified session activation.</p>
       </div>
     </div>
   </div>
@@ -934,16 +984,20 @@
   </div>
 
   <!-- Scripts with cache busting query string -->
-  <script src="/js/auth.js?v=3.3"></script>
-  <script src="/js/documents.js?v=3.3"></script>
-  <script src="/js/audit.js?v=3.3"></script>
-  <script src="/js/app.js?v=3.3"></script>
+  <script src="/js/auth.js?v=3.5"></script>
+  <script src="/js/documents.js?v=3.5"></script>
+  <script src="/js/audit.js?v=3.5"></script>
+  <script src="/js/app.js?v=3.5"></script>
   <script>
     // Safe initialization & resilient tab and form bindings
     document.addEventListener('DOMContentLoaded', () => {
       try {
         if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
       } catch (e) {}
+
+      if (typeof initAuth === 'function') {
+        initAuth();
+      }
 
       // Tab switching bindings
       const loginTab = document.getElementById('portal-tab-btn-login');

@@ -24,11 +24,15 @@ async function migrate() {
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
         email TEXT UNIQUE NOT NULL,
+        phone TEXT,
         password_hash TEXT NOT NULL,
         role TEXT NOT NULL CHECK (role IN ('admin', 'owner', 'viewer')),
         otp_code TEXT,
         otp_expires_at TEXT,
         is_2fa_enabled INTEGER DEFAULT 0,
+        account_status TEXT DEFAULT 'ACTIVE',
+        admin_auth_code TEXT,
+        terms_accepted INTEGER DEFAULT 1,
         created_at TEXT DEFAULT (datetime('now')),
         updated_at TEXT DEFAULT (datetime('now'))
       );
@@ -100,6 +104,22 @@ async function migrate() {
 
     await db.exec(sqliteSchema);
   }
+
+  // Safe schema upgrade helper for existing tables
+  const safeAlter = async (sql) => {
+    try {
+      if (db.exec) await db.exec(sql);
+      else await db.query(sql);
+    } catch (e) {
+      // Column or index already exists, silently proceed
+    }
+  };
+
+  await safeAlter('ALTER TABLE users ADD COLUMN phone TEXT;');
+  await safeAlter("ALTER TABLE users ADD COLUMN account_status TEXT DEFAULT 'ACTIVE';");
+  await safeAlter('ALTER TABLE users ADD COLUMN admin_auth_code TEXT;');
+  await safeAlter('ALTER TABLE users ADD COLUMN terms_accepted INTEGER DEFAULT 1;');
+  await safeAlter('CREATE INDEX IF NOT EXISTS idx_users_phone ON users(phone);');
 
   console.log('[Migration] Database schema migrated successfully.');
 }

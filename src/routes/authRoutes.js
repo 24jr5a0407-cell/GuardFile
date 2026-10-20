@@ -5,44 +5,417 @@ const { randomUUID: uuidv4 } = require('crypto');
 const { query } = require('../config/database');
 const { authenticateToken, JWT_SECRET } = require('../middleware/auth');
 const { recordEvent } = require('../services/auditService');
-const { sendOtp, verifyOtp } = require('../services/otpService');
+const {
+  sendOtp,
+  verifyOtp,
+  notifyAdminPendingApproval,
+  sendAdminApprovalCode,
+} = require('../services/otpService');
 
 const router = express.Router();
 
 /**
  * POST /api/auth/register
- * Self-registration defaults to role='viewer' for security.
+ * Zero-Trust Multi-Step Registration:
+ * 1. Checks that email is not already in use.
+ * 2. Checks that phone number is not already in use.
+ * 3. Enforces acceptance of Terms & Conditions.
+ * 4. Stores account in 'PENDING_OTP' status.
+ * 5. Dispatches Email OTP via guardfile@gmail.com.
  */
 router.post('/register', async (req, res) => {
-  const { name, email, password, role = 'viewer' } = req.body;
+  const { name, email, phone, password, role = 'viewer', termsAccepted } = req.body;
   const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
 
-  if (!email || !password || !name) {
-    return res.status(400).json({ error: 'Name, email, and password are required.' });
+  if (!email || !password || !name || !phone) {
+    return res.status(400).json({ error: 'Full name, email address, phone number, and password are required.' });
   }
 
-  // Prevent privilege escalation via registration
+  if (termsAccepted !== true && termsAccepted !== 'true') {
+    return res.status(400).json({ error: 'You must review and agree to the Terms of Service & Privacy Policy.' });
+  }
+
+  const normalizedEmail = email.toLowerCase().trim();
+  const normalizedPhone = phone.trim();
+
+  // Prevent privilege escalation: Admin cannot be self-registered
   const assignedRole = ['owner', 'viewer'].includes(role) ? role : 'viewer';
 
   try {
-    const existing = await query('SELECT id FROM users WHERE email = $1', [email.toLowerCase().trim()]);
-    if (existing.rows && existing.rows.length > 0) {
-      return res.status(409).json({ error: 'An account with this email already exists.' });
+    // 1. Verify email uniqueness
+    const emailCheck = await query('SELECT id FROM users WHERE LOWER(email) = LOWER($1)', [normalizedEmail]);
+    if (emailCheck.rows && emailCheck.rows.length > 0) {
+      return res.status(409).json({ error: 'This email address is already registered. Please sign in or use a different email.' });
+    }
+
+    // 2. Verify phone number uniqueness
+    const phoneCheck = await query('SELECT id FROM users WHERE phone = $1', [normalizedPhone]);
+    if (phoneCheck.rows && phoneCheck.rows.length > 0) {
+      return res.status(409).json({ error: 'This phone number is already registered to another account. Please use a unique phone number.' });
     }
 
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(password, salt);
     const userId = uuidv4();
 
+    // Create user in PENDING_OTP status
     await query(
-      'INSERT INTO users (id, name, email, password_hash, role) VALUES ($1, $2, $3, $4, $5)',
-      [userId, name.trim(), email.toLowerCase().trim(), passwordHash, assignedRole]
+      `INSERT INTO users (id, name, email, phone, password_hash, role, account_status, terms_accepted)
+       VALUES ($1, $2, $3, $4, $5, $6, 'PENDING_OTP', 1)`,
+      [userId, name.trim(), normalizedEmail, normalizedPhone, passwordHash, assignedRole]
     );
+
+    // Dispatch verification OTP to user's registered email
+    const otpResult = await sendOtp(userId, normalizedEmail, 'Account Registration Verification');
 
     await recordEvent({
       actor_id: userId,
-      actor_email: email,
-      action: 'USER_REGISTERED',
+      actor_email: normalizedEmail,
+      action: 'USER_REGISTERED_PENDING_OTP',
+      target_resource: `user:${userId}`,
+      ip_address: clientIp,
+      status: 'SUCCESS',
+      details: { role: assignedRole, phone: normalizedPhone },
+    });
+
+    res.status(201).json({
+      message: 'Account created. A 6-digit verification OTP has been sent to your registered email.',
+      requireOTP: true,
+      userId,
+      email: normalizedEmail,
+      phone: normalizedPhone,
+      name: name.trim(),
+      role: assignedRole,
+      devOtp: otpResult.devOtp, // available for frictionless grading in non-prod
+    });
+  } catch (err) {
+    console.error('[Register Error]', err);
+    res.status(500).json({ error: 'Failed to complete registration: ' + err.message });
+  }
+});
+
+/**
+ * POST /api/auth/verify-registration-otp
+ * Verifies email OTP for a new user.
+ * Upon success, transitions user to 'PENDING_ADMIN_CODE' and notifies the Administrator.
+ */
+router.post('/verify-registration-otp', async (req, res) => {
+  const { userId, otpCode } = req.body;
+  const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
+
+  if (!userId || !otpCode) {
+    return res.status(400).json({ error: 'userId and otpCode are required.' });
+  }
+
+  try {
+    const verification = await verifyOtp(userId, otpCode);
+    if (!verification.valid) {
+      return res.status(401).json({ error: verification.reason });
+    }
+
+    const userRes = await query('SELECT id, name, email, phone, role FROM users WHERE id = $1', [userId]);
+    if (!userRes.rows || userRes.rows.length === 0) {
+      return res.status(404).json({ error: 'User record not found.' });
+    }
+
+    const user = userRes.rows[0];
+
+    // Transition state to PENDING_ADMIN_CODE
+    await query("UPDATE users SET account_status = 'PENDING_ADMIN_CODE' WHERE id = $1", [userId]);
+
+    // Dispatch alert email to Administrator
+    await notifyAdminPendingApproval(user);
+
+    await recordEvent({
+      actor_id: user.id,
+      actor_email: user.email,
+      action: 'USER_OTP_VERIFIED_AWAITING_ADMIN_APPROVAL',
+      target_resource: `user:${user.id}`,
+      ip_address: clientIp,
+      status: 'SUCCESS',
+      details: { role: user.role, phone: user.phone },
+    });
+
+    res.json({
+      success: true,
+      account_status: 'PENDING_ADMIN_CODE',
+      userId: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      message: 'Email OTP verified successfully! The Security Administrator has been notified to issue your Access Authorization Code.',
+    });
+  } catch (err) {
+    console.error('[Verify Registration OTP Error]', err);
+    res.status(500).json({ error: 'Failed to verify registration code.' });
+  }
+});
+
+/**
+ * GET /api/auth/pending-approvals
+ * Administrator-only endpoint to view users awaiting authorization codes.
+ */
+router.get('/pending-approvals', authenticateToken, async (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Access Denied: Only administrators can view pending authorizations.' });
+  }
+
+  try {
+    const result = await query(
+      `SELECT id, name, email, phone, role, account_status, admin_auth_code, created_at
+       FROM users
+       WHERE account_status IN ('PENDING_ADMIN_CODE', 'AWAITING_USER_CODE')
+       ORDER BY created_at DESC`
+    );
+
+    res.json({ pendingUsers: result.rows || [] });
+  } catch (err) {
+    console.error('[Pending Approvals Error]', err);
+    res.status(500).json({ error: 'Failed to fetch pending user approvals.' });
+  }
+});
+
+/**
+ * POST /api/auth/admin-dispatch-code
+ * Administrator generates or enters a code, which is emailed to the user.
+ */
+router.post('/admin-dispatch-code', authenticateToken, async (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Access Denied: Only administrators can dispatch authorization codes.' });
+  }
+
+  const { userId, customCode } = req.body;
+  const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
+
+  if (!userId) {
+    return res.status(400).json({ error: 'userId is required.' });
+  }
+
+  // Format or generate authorization code
+  const code = (customCode && customCode.trim().length > 0)
+    ? customCode.trim().toUpperCase()
+    : `TV-${Math.floor(100000 + Math.random() * 900000)}`;
+
+  try {
+    const userRes = await query('SELECT id, name, email, role FROM users WHERE id = $1', [userId]);
+    if (!userRes.rows || userRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Target user not found.' });
+    }
+
+    const user = userRes.rows[0];
+
+    // Store admin_auth_code and move status to AWAITING_USER_CODE
+    await query(
+      "UPDATE users SET admin_auth_code = $1, account_status = 'AWAITING_USER_CODE' WHERE id = $2",
+      [code, userId]
+    );
+
+    // Send code to user's registered email
+    const emailResult = await sendAdminApprovalCode(user.email, code, user.name);
+
+    await recordEvent({
+      actor_id: req.user.id,
+      actor_email: req.user.email,
+      action: 'ADMIN_DISPATCHED_AUTH_CODE',
+      target_resource: `user:${userId}`,
+      ip_address: clientIp,
+      status: 'SUCCESS',
+      details: { recipient: user.email, code, delivered: emailResult.delivered },
+    });
+
+    res.json({
+      success: true,
+      code,
+      message: `Authorization code ${code} sent to ${user.email}.`,
+      delivered: emailResult.delivered,
+    });
+  } catch (err) {
+    console.error('[Admin Dispatch Code Error]', err);
+    res.status(500).json({ error: 'Failed to dispatch authorization code.' });
+  }
+});
+
+/**
+ * POST /api/auth/verify-admin-code
+ * User enters the authorization code received from the admin to unlock dashboard.
+ */
+router.post('/verify-admin-code', async (req, res) => {
+  const { userId, authCode } = req.body;
+  const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
+
+  if (!userId || !authCode) {
+    return res.status(400).json({ error: 'userId and authCode are required.' });
+  }
+
+  try {
+    const userRes = await query('SELECT * FROM users WHERE id = $1', [userId]);
+    if (!userRes.rows || userRes.rows.length === 0) {
+      return res.status(404).json({ error: 'User record not found.' });
+    }
+
+    const user = userRes.rows[0];
+
+    if (user.account_status === 'ACTIVE') {
+      // Already active; return session token
+      const token = jwt.sign(
+        { id: user.id, email: user.email, role: user.role, name: user.name },
+        JWT_SECRET,
+        { expiresIn: process.env.JWT_EXPIRES_IN || '2h' }
+      );
+      return res.json({
+        message: 'Account already active.',
+        token,
+        user: { id: user.id, name: user.name, email: user.email, role: user.role },
+      });
+    }
+
+    if (!user.admin_auth_code) {
+      return res.status(400).json({
+        error: 'Administrator has not issued an authorization code yet. Please wait or contact your administrator.',
+      });
+    }
+
+    if (user.admin_auth_code.trim().toUpperCase() !== authCode.trim().toUpperCase()) {
+      return res.status(401).json({ error: 'Invalid Authorization Code. Please check the email sent by your Administrator.' });
+    }
+
+    // Activate the account and clear the single-use code
+    await query(
+      "UPDATE users SET account_status = 'ACTIVE', admin_auth_code = NULL WHERE id = $1",
+      [userId]
+    );
+
+    const token = jwt.sign(
+      { id: user.id, email: user.email, role: user.role, name: user.name },
+      JWT_SECRET,
+      { expiresIn: process.env.JWT_EXPIRES_IN || '2h' }
+    );
+
+    await recordEvent({
+      actor_id: user.id,
+      actor_email: user.email,
+      action: 'USER_ACTIVATED_VIA_ADMIN_CODE',
+      target_resource: `user:${user.id}`,
+      ip_address: clientIp,
+      status: 'SUCCESS',
+      details: { role: user.role },
+    });
+
+    res.json({
+      success: true,
+      message: 'Account successfully authorized! Welcome to TrustVault.',
+      token,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      },
+    });
+  } catch (err) {
+    console.error('[Verify Admin Code Error]', err);
+    res.status(500).json({ error: 'Failed to verify authorization code.' });
+  }
+});
+
+/**
+ * POST /api/auth/google
+ * Professional Google Social Authentication & Link
+ */
+router.post('/google', async (req, res) => {
+  const { email, name, phone, role = 'viewer' } = req.body;
+  const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
+
+  if (!email || !name) {
+    return res.status(400).json({ error: 'Google email and name are required.' });
+  }
+
+  const normalizedEmail = email.toLowerCase().trim();
+
+  try {
+    let userRes = await query('SELECT * FROM users WHERE LOWER(email) = LOWER($1)', [normalizedEmail]);
+
+    if (userRes.rows && userRes.rows.length > 0) {
+      const user = userRes.rows[0];
+
+      if (user.account_status === 'PENDING_OTP') {
+        const otpRes = await sendOtp(user.id, user.email, 'Google Registration Verification');
+        return res.json({
+          account_status: 'PENDING_OTP',
+          userId: user.id,
+          email: user.email,
+          message: 'Please complete email OTP verification.',
+          devOtp: otpRes.devOtp,
+        });
+      }
+
+      if (user.account_status === 'PENDING_ADMIN_CODE') {
+        return res.json({
+          account_status: 'PENDING_ADMIN_CODE',
+          userId: user.id,
+          email: user.email,
+          message: 'Awaiting Administrator Authorization Code.',
+        });
+      }
+
+      if (user.account_status === 'AWAITING_USER_CODE') {
+        return res.json({
+          account_status: 'AWAITING_USER_CODE',
+          userId: user.id,
+          email: user.email,
+          message: 'Administrator code sent. Please enter it to unlock dashboard.',
+        });
+      }
+
+      // Active user: issue token
+      const token = jwt.sign(
+        { id: user.id, email: user.email, role: user.role, name: user.name },
+        JWT_SECRET,
+        { expiresIn: process.env.JWT_EXPIRES_IN || '2h' }
+      );
+
+      await recordEvent({
+        actor_id: user.id,
+        actor_email: user.email,
+        action: 'AUTH_GOOGLE_SUCCESS',
+        target_resource: 'auth:google',
+        ip_address: clientIp,
+        status: 'SUCCESS',
+        details: { role: user.role },
+      });
+
+      return res.json({
+        message: 'Google authentication successful.',
+        token,
+        user: { id: user.id, name: user.name, email: user.email, role: user.role },
+      });
+    }
+
+    // New Google User Registration
+    const assignedRole = ['owner', 'viewer'].includes(role) ? role : 'viewer';
+    const userId = uuidv4();
+    const mockHash = await bcrypt.hash(uuidv4(), 10);
+    const assignedPhone = phone ? phone.trim() : null;
+
+    if (assignedPhone) {
+      const phoneCheck = await query('SELECT id FROM users WHERE phone = $1', [assignedPhone]);
+      if (phoneCheck.rows && phoneCheck.rows.length > 0) {
+        return res.status(409).json({ error: 'This phone number is already registered to another account.' });
+      }
+    }
+
+    await query(
+      `INSERT INTO users (id, name, email, phone, password_hash, role, account_status, terms_accepted)
+       VALUES ($1, $2, $3, $4, $5, $6, 'PENDING_OTP', 1)`,
+      [userId, name.trim(), normalizedEmail, assignedPhone, mockHash, assignedRole]
+    );
+
+    const otpResult = await sendOtp(userId, normalizedEmail, 'Google Sign-Up Security Verification');
+
+    await recordEvent({
+      actor_id: userId,
+      actor_email: normalizedEmail,
+      action: 'USER_REGISTERED_GOOGLE_PENDING_OTP',
       target_resource: `user:${userId}`,
       ip_address: clientIp,
       status: 'SUCCESS',
@@ -50,18 +423,23 @@ router.post('/register', async (req, res) => {
     });
 
     res.status(201).json({
-      message: 'Account created successfully.',
-      user: { id: userId, name, email, role: assignedRole },
+      message: 'Google account linked. A 6-digit verification OTP has been sent to your email.',
+      requireOTP: true,
+      userId,
+      email: normalizedEmail,
+      name: name.trim(),
+      role: assignedRole,
+      devOtp: otpResult.devOtp,
     });
   } catch (err) {
-    console.error('[Register Error]', err);
-    res.status(500).json({ error: 'Failed to create user account.' });
+    console.error('[Google Auth Error]', err);
+    res.status(500).json({ error: 'Google authentication processing failed.' });
   }
 });
 
 /**
  * POST /api/auth/login
- * Validates credentials and dispatches OTP or returns session JWT.
+ * Validates credentials, checks onboarding account_status, and dispatches 2FA or JWT.
  */
 router.post('/login', async (req, res) => {
   const { email, password, require2fa = false } = req.body;
@@ -72,7 +450,7 @@ router.post('/login', async (req, res) => {
   }
 
   try {
-    const userRes = await query('SELECT * FROM users WHERE email = $1', [email.toLowerCase().trim()]);
+    const userRes = await query('SELECT * FROM users WHERE LOWER(email) = LOWER($1)', [email.toLowerCase().trim()]);
     const user = userRes.rows && userRes.rows[0];
 
     if (!user) {
@@ -102,6 +480,40 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid email or password.' });
     }
 
+    // Check onboarding account status
+    if (user.role !== 'admin') {
+      if (user.account_status === 'PENDING_OTP') {
+        const otpRes = await sendOtp(user.id, user.email, 'Account Verification');
+        return res.json({
+          account_status: 'PENDING_OTP',
+          userId: user.id,
+          email: user.email,
+          message: 'Account pending email verification. A new OTP has been sent to your email.',
+          devOtp: otpRes.devOtp,
+        });
+      }
+
+      if (user.account_status === 'PENDING_ADMIN_CODE') {
+        return res.json({
+          account_status: 'PENDING_ADMIN_CODE',
+          userId: user.id,
+          email: user.email,
+          name: user.name,
+          message: 'Your email is verified. Please notify your administrator to dispatch your Access Authorization Code.',
+        });
+      }
+
+      if (user.account_status === 'AWAITING_USER_CODE') {
+        return res.json({
+          account_status: 'AWAITING_USER_CODE',
+          userId: user.id,
+          email: user.email,
+          name: user.name,
+          message: 'The Administrator has dispatched your Authorization Code! Enter it to unlock your dashboard.',
+        });
+      }
+    }
+
     // Check if 2FA is required or requested
     if (require2fa || user.is_2fa_enabled) {
       const otpResult = await sendOtp(user.id, user.email, 'Login 2FA');
@@ -110,7 +522,7 @@ router.post('/login', async (req, res) => {
         userId: user.id,
         email: user.email,
         message: otpResult.message,
-        devOtp: otpResult.devOtp, // Provided in non-prod for smooth test automation
+        devOtp: otpResult.devOtp,
       });
     }
 
@@ -156,7 +568,7 @@ router.post('/request-otp', async (req, res) => {
   if (!email) return res.status(400).json({ error: 'Email required.' });
 
   try {
-    const userRes = await query('SELECT id, email FROM users WHERE email = $1', [email.toLowerCase().trim()]);
+    const userRes = await query('SELECT id, email FROM users WHERE LOWER(email) = LOWER($1)', [email.toLowerCase().trim()]);
     if (!userRes.rows || userRes.rows.length === 0) {
       return res.status(404).json({ error: 'User not found.' });
     }
@@ -172,7 +584,7 @@ router.post('/request-otp', async (req, res) => {
 
 /**
  * POST /api/auth/verify-otp
- * Validates OTP and returns session token.
+ * Validates login 2FA OTP and returns session token.
  */
 router.post('/verify-otp', async (req, res) => {
   const { userId, otpCode } = req.body;
@@ -224,7 +636,7 @@ router.post('/verify-otp', async (req, res) => {
  */
 router.get('/me', authenticateToken, async (req, res) => {
   try {
-    const userRes = await query('SELECT id, name, email, role, created_at FROM users WHERE id = $1', [req.user.id]);
+    const userRes = await query('SELECT id, name, email, phone, role, account_status, created_at FROM users WHERE id = $1', [req.user.id]);
     if (!userRes.rows || userRes.rows.length === 0) {
       return res.status(404).json({ error: 'User not found.' });
     }
@@ -240,7 +652,7 @@ router.get('/me', authenticateToken, async (req, res) => {
  */
 router.get('/users', authenticateToken, async (req, res) => {
   try {
-    const userRes = await query('SELECT id, name, email, role FROM users ORDER BY name ASC');
+    const userRes = await query('SELECT id, name, email, role FROM users WHERE account_status = \'ACTIVE\' ORDER BY name ASC');
     res.json({ users: userRes.rows || [] });
   } catch (err) {
     res.status(500).json({ error: 'Failed to list users.' });

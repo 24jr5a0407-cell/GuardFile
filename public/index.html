@@ -99,6 +99,10 @@
         <button onclick="switchTab('threats')" id="tab-btn-threats" class="tab-btn px-4 py-2 text-sm font-semibold rounded-xl text-slate-600 hover:bg-slate-100 flex items-center gap-2">
           <i data-lucide="shield-alert" class="w-4 h-4"></i> Threat Model & Proofs
         </button>
+        <button onclick="switchTab('approvals')" id="tab-btn-approvals" class="tab-btn hidden px-4 py-2 text-sm font-semibold rounded-xl text-slate-600 hover:bg-slate-100 flex items-center gap-2">
+          <i data-lucide="user-check" class="w-4 h-4 text-purple-600"></i> User Approvals
+          <span id="pending-badge" class="hidden px-2 py-0.5 text-[10px] font-extrabold rounded-full bg-rose-500 text-white">0</span>
+        </button>
       </nav>
 
       <div class="flex items-center gap-2">
@@ -316,6 +320,45 @@
       </div>
     </div>
 
+    <!-- TAB 4: User Authorizations View (Admin Only) -->
+    <div id="view-approvals" class="tab-view hidden flex flex-col gap-4">
+      <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-purple-600 text-white flex items-center justify-center shadow-md shadow-purple-500/20">
+            <i data-lucide="user-check" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h2 class="text-sm font-bold text-slate-900">Zero-Trust User Onboarding & Access Authorization</h2>
+            <p class="text-xs text-slate-500">Inspect users who passed email OTP and dispatch secure Authorization Codes to their registered email.</p>
+          </div>
+        </div>
+
+        <button onclick="loadPendingApprovals()" class="px-3.5 py-2 text-xs font-semibold rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center gap-1.5 transition">
+          <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Refresh List
+        </button>
+      </div>
+
+      <!-- Approvals Table Container -->
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-50 text-slate-600 uppercase font-semibold border-b border-slate-200">
+              <tr>
+                <th class="py-3.5 px-4">User Details</th>
+                <th class="py-3.5 px-4">Contact Phone</th>
+                <th class="py-3.5 px-4">Requested Role</th>
+                <th class="py-3.5 px-4">Onboarding Status</th>
+                <th class="py-3.5 px-4">Authorization Action</th>
+              </tr>
+            </thead>
+            <tbody id="approvals-table-body" class="divide-y divide-slate-100 font-mono text-[11px]">
+              <!-- Dynamically populated by auth.js -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <!-- MODAL: Upload Document -->
@@ -428,52 +471,414 @@
     </div>
   </div>
 
-  <!-- MODAL: Login / OTP -->
-  <div id="modal-auth" class="modal-backdrop hidden fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-sm w-full p-6 animate-scale-up">
-      <div class="text-center mb-6">
-        <div class="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center mx-auto mb-3 shadow-md shadow-blue-500/20">
-          <i data-lucide="shield-check" class="w-7 h-7"></i>
+  <!-- MODAL: Professional Zero-Trust Authentication Center -->
+  <div id="modal-auth" class="modal-backdrop hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-6 animate-scale-up max-h-[92vh] overflow-y-auto">
+      
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-500/20">
+            <i data-lucide="shield-check" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-bold text-slate-900">TrustVault Identity</h3>
+            <p class="text-[11px] text-slate-500">Zero-Trust Access Control</p>
+          </div>
         </div>
-        <h3 class="text-lg font-bold text-slate-900" id="auth-modal-title">TrustVault Login</h3>
-        <p class="text-xs text-slate-500" id="auth-modal-subtitle">Authenticate to access secured vaults</p>
+        <button onclick="closeLoginModal()" class="text-slate-400 hover:text-slate-600 transition">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
       </div>
 
-      <!-- Login Form Step -->
-      <form id="login-form" onsubmit="handleLoginSubmit(event)" class="flex flex-col gap-4">
-        <div>
-          <label class="block text-xs font-semibold text-slate-700 mb-1">Email</label>
-          <input type="email" id="login-email" required class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-hidden" placeholder="name@trustvault.local" />
-        </div>
-        <div>
-          <label class="block text-xs font-semibold text-slate-700 mb-1">Password</label>
-          <input type="password" id="login-password" required class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-hidden" placeholder="••••••••••••" />
-        </div>
-        <div class="flex items-center gap-2">
-          <input type="checkbox" id="login-require-2fa" class="rounded text-blue-600 focus:ring-blue-500" />
-          <label for="login-require-2fa" class="text-xs text-slate-600">Require OTP Email 2FA</label>
-        </div>
-        <div id="login-error" class="hidden p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs"></div>
-        <button type="submit" class="w-full py-2.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-xs transition">
+      <!-- Segmented Tab Header (Sign In vs Create Account) -->
+      <div id="auth-modal-tab-header" class="flex border-b border-slate-200 mt-4 mb-5">
+        <button
+          id="auth-tab-btn-login"
+          onclick="showAuthTab('login')"
+          class="flex-1 py-2 text-xs font-bold text-center border-b-2 border-blue-600 text-blue-600 transition"
+        >
           Sign In
         </button>
-      </form>
-
-      <!-- OTP Verification Step -->
-      <form id="otp-form" onsubmit="handleOtpSubmit(event)" class="hidden flex flex-col gap-4">
-        <div class="text-center p-3 bg-blue-50 rounded-xl border border-blue-100">
-          <p class="text-xs text-blue-800" id="otp-status-text">Security code dispatched to your email.</p>
-          <p class="text-[11px] font-mono text-blue-600 mt-1" id="otp-dev-hint"></p>
-        </div>
-        <div>
-          <label class="block text-xs font-semibold text-slate-700 mb-1">Enter 6-Digit Code</label>
-          <input type="text" id="otp-code-input" maxlength="6" required class="w-full text-center tracking-widest font-mono text-2xl py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-hidden" placeholder="123456" />
-        </div>
-        <div id="otp-error" class="hidden p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs"></div>
-        <button type="submit" class="w-full py-2.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-xs transition">
-          Verify & Access Vault
+        <button
+          id="auth-tab-btn-register"
+          onclick="showAuthTab('register')"
+          class="flex-1 py-2 text-xs font-semibold text-center border-b-2 border-transparent text-slate-500 hover:text-slate-800 transition"
+        >
+          Create Account
         </button>
-      </form>
+      </div>
+
+      <!-- VIEW 1: Sign In -->
+      <div id="auth-view-login" class="flex flex-col gap-4">
+        <!-- Continue with Google Button -->
+        <button
+          type="button"
+          onclick="handleGoogleSignIn()"
+          class="w-full flex items-center justify-center gap-3 py-2.5 px-4 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl shadow-xs font-semibold text-xs text-slate-700 transition"
+        >
+          <svg class="w-4 h-4" viewBox="0 0 24 24">
+            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+          </svg>
+          Continue with Google
+        </button>
+
+        <!-- Divider -->
+        <div class="relative my-1">
+          <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-slate-200"></div></div>
+          <div class="relative flex justify-center text-[10px] uppercase">
+            <span class="bg-white px-2.5 text-slate-400 font-bold tracking-wider">Or with work email</span>
+          </div>
+        </div>
+
+        <!-- Login Form -->
+        <form onsubmit="handleLoginSubmit(event)" class="flex flex-col gap-3.5">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Work Email</label>
+            <input
+              type="email"
+              id="login-email"
+              required
+              class="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+              placeholder="e.g. alice@trustvault.local"
+            />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Password</label>
+            <input
+              type="password"
+              id="login-password"
+              required
+              class="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+              placeholder="••••••••••••"
+            />
+          </div>
+          <div class="flex items-center justify-between">
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" id="login-require-2fa" class="rounded text-blue-600 focus:ring-blue-500" />
+              <span class="text-xs text-slate-600">Require Email OTP 2FA</span>
+            </label>
+            <span class="text-[11px] text-blue-600 font-semibold cursor-pointer" onclick="quickLogin('admin@trustvault.local', 'AdminPassword123!')">Demo Admin</span>
+          </div>
+
+          <div id="login-error" class="hidden p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs"></div>
+
+          <button
+            type="submit"
+            class="w-full py-2.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-xs transition"
+          >
+            Sign In to Vault
+          </button>
+        </form>
+
+        <p class="text-center text-xs text-slate-500 mt-1">
+          Don't have an account?
+          <button type="button" onclick="showAuthTab('register')" class="text-blue-600 font-bold hover:underline">
+            Create an account
+          </button>
+        </p>
+      </div>
+
+      <!-- VIEW 2: Create Account (Register) -->
+      <div id="auth-view-register" class="hidden flex flex-col gap-4">
+        <!-- Continue with Google Button -->
+        <button
+          type="button"
+          onclick="handleGoogleSignIn()"
+          class="w-full flex items-center justify-center gap-3 py-2 px-4 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl shadow-xs font-semibold text-xs text-slate-700 transition"
+        >
+          <svg class="w-4 h-4" viewBox="0 0 24 24">
+            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+          </svg>
+          Sign Up with Google
+        </button>
+
+        <div class="relative my-0.5">
+          <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-slate-200"></div></div>
+          <div class="relative flex justify-center text-[10px] uppercase">
+            <span class="bg-white px-2.5 text-slate-400 font-bold tracking-wider">Or register credentials</span>
+          </div>
+        </div>
+
+        <!-- Registration Form -->
+        <form onsubmit="handleRegisterSubmit(event)" class="flex flex-col gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Full Name *</label>
+            <input
+              type="text"
+              id="reg-name"
+              required
+              class="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+              placeholder="e.g. Sarah Connor"
+            />
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">Work Email *</label>
+              <input
+                type="email"
+                id="reg-email"
+                required
+                class="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                placeholder="sarah@company.com"
+              />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">Phone Number *</label>
+              <input
+                type="tel"
+                id="reg-phone"
+                required
+                class="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                placeholder="+1 555 019 9283"
+              />
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">Password *</label>
+              <input
+                type="password"
+                id="reg-password"
+                required
+                minlength="6"
+                class="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                placeholder="••••••••"
+              />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">Confirm Password *</label>
+              <input
+                type="password"
+                id="reg-confirm-password"
+                required
+                minlength="6"
+                class="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                placeholder="••••••••"
+              />
+            </div>
+          </div>
+
+          <!-- Role Selection Cards -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1.5">Select Document Role *</label>
+            <div class="grid grid-cols-2 gap-2">
+              <label class="flex flex-col p-2.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-white cursor-pointer transition has-checked:border-blue-600 has-checked:bg-blue-50/50">
+                <div class="flex items-center gap-1.5 mb-1">
+                  <input type="radio" name="reg-role" value="owner" checked class="text-blue-600 focus:ring-blue-500" />
+                  <span class="text-xs font-bold text-slate-900">Document Owner</span>
+                </div>
+                <span class="text-[10px] text-slate-500 leading-tight">Can upload, encrypt, grant & revoke permissions.</span>
+              </label>
+
+              <label class="flex flex-col p-2.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-white cursor-pointer transition has-checked:border-blue-600 has-checked:bg-blue-50/50">
+                <div class="flex items-center gap-1.5 mb-1">
+                  <input type="radio" name="reg-role" value="viewer" class="text-blue-600 focus:ring-blue-500" />
+                  <span class="text-xs font-bold text-slate-900">Document Viewer</span>
+                </div>
+                <span class="text-[10px] text-slate-500 leading-tight">Read-only zero-trust access to shared vaults.</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Terms & Conditions Checkbox -->
+          <div class="p-2.5 bg-slate-50 rounded-xl border border-slate-200 flex items-start gap-2.5">
+            <input type="checkbox" id="reg-terms" required class="mt-0.5 rounded text-blue-600 focus:ring-blue-500" />
+            <label for="reg-terms" class="text-[11px] text-slate-600 leading-relaxed">
+              I agree to the
+              <button type="button" onclick="openTermsModal()" class="text-blue-600 font-bold underline hover:text-blue-700">
+                Terms of Service & Privacy Policy
+              </button>,
+              including immutable audit logging and zero-trust verification.
+            </label>
+          </div>
+
+          <div id="reg-error" class="hidden p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs"></div>
+
+          <button
+            type="submit"
+            class="w-full py-2.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-xs transition"
+          >
+            Create Account & Verify OTP
+          </button>
+        </form>
+
+        <p class="text-center text-xs text-slate-500">
+          Already registered?
+          <button type="button" onclick="showAuthTab('login')" class="text-blue-600 font-bold hover:underline">
+            Sign In instead
+          </button>
+        </p>
+      </div>
+
+      <!-- VIEW 3: Email OTP Verification Step -->
+      <div id="auth-view-otp" class="hidden flex flex-col gap-4">
+        <div class="text-center">
+          <div class="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-200 text-blue-600 flex items-center justify-center mx-auto mb-2 shadow-xs">
+            <i data-lucide="mail-check" class="w-6 h-6"></i>
+          </div>
+          <h4 class="text-base font-bold text-slate-900">Verify Email Address</h4>
+          <p class="text-xs text-slate-500 mt-1">
+            We dispatched a 6-digit one-time code to
+            <span id="otp-target-email" class="font-bold text-slate-800 font-mono"></span>
+          </p>
+        </div>
+
+        <div class="p-3 bg-blue-50/70 border border-blue-100 rounded-xl text-center">
+          <p class="text-xs text-blue-800" id="otp-status-text">Security code dispatched via email.</p>
+          <p class="text-[11px] font-mono font-bold text-blue-700 mt-1" id="otp-dev-hint"></p>
+        </div>
+
+        <form onsubmit="handleOtpSubmit(event)" class="flex flex-col gap-3.5">
+          <div>
+            <label class="block text-center text-xs font-semibold text-slate-700 mb-1.5 uppercase tracking-wider">
+              Enter 6-Digit Code
+            </label>
+            <input
+              type="text"
+              id="otp-code-input"
+              maxlength="6"
+              required
+              class="w-full text-center tracking-widest font-mono font-bold text-3xl py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-hidden bg-slate-50 focus:bg-white"
+              placeholder="••••••"
+            />
+          </div>
+
+          <div id="otp-error" class="hidden p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs"></div>
+
+          <button
+            type="submit"
+            class="w-full py-2.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-xs transition"
+          >
+            Verify Email Code
+          </button>
+        </form>
+
+        <div class="text-center">
+          <button type="button" onclick="showAuthTab('login')" class="text-xs text-slate-500 hover:text-slate-800">
+            ← Back to Sign In
+          </button>
+        </div>
+      </div>
+
+      <!-- VIEW 4: Admin Authorization Code Step -->
+      <div id="auth-view-admin-code" class="hidden flex flex-col gap-4">
+        <div class="text-center">
+          <div class="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center mx-auto mb-2 shadow-xs">
+            <i data-lucide="shield-alert" class="w-6 h-6"></i>
+          </div>
+          <h4 class="text-base font-bold text-slate-900">Security Officer Authorization</h4>
+          <span id="admin-code-status-pill" class="inline-block mt-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+            Awaiting Administrator Review
+          </span>
+        </div>
+
+        <div class="p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-left">
+          <p class="text-xs text-slate-700 leading-relaxed" id="admin-code-notice">
+            Your email has been verified! Under TrustVault Zero-Trust policies, your System Administrator has been notified.
+            Once they dispatch your unique Access Authorization Code, check your registered email inbox and enter the code below.
+          </p>
+          <p class="text-[10px] text-slate-400 font-mono mt-2" id="admin-code-user-info"></p>
+        </div>
+
+        <form onsubmit="handleAdminCodeSubmit(event)" class="flex flex-col gap-3.5">
+          <div>
+            <label class="block text-center text-xs font-semibold text-slate-700 mb-1.5 uppercase tracking-wider">
+              Enter Administrator Authorization Code
+            </label>
+            <input
+              type="text"
+              id="admin-code-input"
+              required
+              class="w-full text-center tracking-widest font-mono font-bold text-2xl py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-hidden bg-slate-50 focus:bg-white uppercase"
+              placeholder="e.g. TV-849201"
+            />
+          </div>
+
+          <div id="admin-code-error" class="hidden p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs"></div>
+
+          <button
+            type="submit"
+            class="w-full py-2.5 text-xs font-bold text-white bg-purple-600 hover:bg-purple-700 rounded-xl shadow-xs transition flex items-center justify-center gap-1.5"
+          >
+            <i data-lucide="unlock" class="w-4 h-4"></i> Unlock Vault & Open Dashboard
+          </button>
+
+          <button
+            type="button"
+            onclick="checkAdminApprovalStatus()"
+            class="w-full py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition flex items-center justify-center gap-1.5"
+          >
+            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Check Approval Status
+          </button>
+        </form>
+
+        <div class="text-center">
+          <button type="button" onclick="showAuthTab('login')" class="text-xs text-slate-500 hover:text-slate-800">
+            ← Switch Account
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- MODAL: Terms of Service & Privacy Policy -->
+  <div id="modal-terms" class="modal-backdrop hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-xl w-full p-6 animate-scale-up max-h-[85vh] flex flex-col">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div class="flex items-center gap-2">
+          <i data-lucide="file-check" class="w-5 h-5 text-blue-600"></i>
+          <h3 class="text-base font-bold text-slate-900">TrustVault Terms of Service & Security Charter</h3>
+        </div>
+        <button onclick="closeTermsModal()" class="text-slate-400 hover:text-slate-600">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="flex-1 overflow-y-auto py-4 text-xs text-slate-600 space-y-3.5 pr-2 leading-relaxed">
+        <div>
+          <h4 class="font-bold text-slate-900 text-sm mb-1">1. Zero-Trust Authorization Model</h4>
+          <p>Every file access, download, view, and modification request is dynamically authenticated and authorized against the database at the time of execution. No permission is cached or assumed from UI routes or tokens.</p>
+        </div>
+
+        <div>
+          <h4 class="font-bold text-slate-900 text-sm mb-1">2. Immutable Cryptographic Audit Ledger</h4>
+          <p>All platform interactions—including uploads, downloads, authorization checks, permission revocations, and refused access attempts—are irreversibly logged in a cryptographically chained SHA-256 ledger. Audit entries cannot be altered, updated, or deleted.</p>
+        </div>
+
+        <div>
+          <h4 class="font-bold text-slate-900 text-sm mb-1">3. Immediate Access Revocation Standard</h4>
+          <p>When a document owner or administrator revokes access for any user, access terminates instantaneously in under one millisecond. Any previously held access tokens or sessions cannot reach revoked resources.</p>
+        </div>
+
+        <div>
+          <h4 class="font-bold text-slate-900 text-sm mb-1">4. Credential Uniqueness & Anti-Collision Policy</h4>
+          <p>All registered emails and phone numbers must be unique across the entire platform. Credential sharing and secondary account reuse are strictly prevented to maintain non-repudiation and forensic accountability.</p>
+        </div>
+
+        <div>
+          <h4 class="font-bold text-slate-900 text-sm mb-1">5. Data Privacy & Confidentiality</h4>
+          <p>Files are stored in physically isolated storage outside the public web root. Documents are validated for magic byte signatures and content checksums to defend against path traversal, tampering, and malware delivery.</p>
+        </div>
+      </div>
+
+      <div class="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+        <button onclick="closeTermsModal()" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition">
+          Close
+        </button>
+        <button onclick="acceptTermsFromModal()" class="px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-xs transition">
+          I Understand & Agree
+        </button>
+      </div>
     </div>
   </div>
 

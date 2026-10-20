@@ -27,19 +27,19 @@ async function seed() {
 
   // 1. Upsert Users (Idempotent)
   const users = [
-    { id: SEED_IDS.admin, name: 'System Administrator', email: 'admin@trustvault.local', hash: adminHash, role: 'admin' },
-    { id: SEED_IDS.alice, name: 'Alice (Executive HR)', email: 'alice@trustvault.local', hash: ownerHash, role: 'owner' },
-    { id: SEED_IDS.bob, name: 'Bob (Chief Architect)', email: 'bob@trustvault.local', hash: ownerHash, role: 'owner' },
-    { id: SEED_IDS.charlie, name: 'Charlie (Auditor / Viewer)', email: 'charlie@trustvault.local', hash: viewerHash, role: 'viewer' },
+    { id: SEED_IDS.admin, name: 'System Administrator', email: 'admin@trustvault.local', phone: '+15550000001', hash: adminHash, role: 'admin' },
+    { id: SEED_IDS.alice, name: 'Alice (Executive HR)', email: 'alice@trustvault.local', phone: '+15550000002', hash: ownerHash, role: 'owner' },
+    { id: SEED_IDS.bob, name: 'Bob (Chief Architect)', email: 'bob@trustvault.local', phone: '+15550000003', hash: ownerHash, role: 'owner' },
+    { id: SEED_IDS.charlie, name: 'Charlie (Auditor / Viewer)', email: 'charlie@trustvault.local', phone: '+15550000004', hash: viewerHash, role: 'viewer' },
   ];
 
   for (const u of users) {
     await query(
-      `INSERT INTO users (id, name, email, password_hash, role)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO users (id, name, email, phone, password_hash, role, account_status, terms_accepted)
+       VALUES ($1, $2, $3, $4, $5, $6, 'ACTIVE', 1)
        ON CONFLICT (email)
-       DO UPDATE SET name = EXCLUDED.name, password_hash = EXCLUDED.password_hash, role = EXCLUDED.role`,
-      [u.id, u.name, u.email, u.hash, u.role]
+       DO UPDATE SET name = EXCLUDED.name, phone = EXCLUDED.phone, password_hash = EXCLUDED.password_hash, role = EXCLUDED.role, account_status = 'ACTIVE'`,
+      [u.id, u.name, u.email, u.phone, u.hash, u.role]
     );
   }
 

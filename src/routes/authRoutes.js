@@ -177,14 +177,14 @@ router.get('/pending-approvals', authenticateToken, async (req, res) => {
 
 /**
  * POST /api/auth/admin-dispatch-code
- * Administrator generates or enters a code, which is emailed to the user.
+ * Administrator generates or enters a code, assigns role (owner/viewer), which is emailed to the user.
  */
 router.post('/admin-dispatch-code', authenticateToken, async (req, res) => {
   if (req.user.role !== 'admin') {
     return res.status(403).json({ error: 'Access Denied: Only administrators can dispatch authorization codes.' });
   }
 
-  const { userId, customCode } = req.body;
+  const { userId, customCode, assignedRole } = req.body;
   const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
 
   if (!userId) {
@@ -203,11 +203,12 @@ router.post('/admin-dispatch-code', authenticateToken, async (req, res) => {
     }
 
     const user = userRes.rows[0];
+    const roleToSet = (assignedRole === 'owner' || assignedRole === 'viewer') ? assignedRole : user.role;
 
-    // Store admin_auth_code and move status to AWAITING_USER_CODE
+    // Store admin_auth_code, update role, and move status to AWAITING_USER_CODE
     await query(
-      "UPDATE users SET admin_auth_code = $1, account_status = 'AWAITING_USER_CODE' WHERE id = $2",
-      [code, userId]
+      "UPDATE users SET admin_auth_code = $1, account_status = 'AWAITING_USER_CODE', role = $2 WHERE id = $3",
+      [code, roleToSet, userId]
     );
 
     // Send code to user's registered email
@@ -220,18 +221,54 @@ router.post('/admin-dispatch-code', authenticateToken, async (req, res) => {
       target_resource: `user:${userId}`,
       ip_address: clientIp,
       status: 'SUCCESS',
-      details: { recipient: user.email, code, delivered: emailResult.delivered },
+      details: { recipient: user.email, code, assignedRole: roleToSet, delivered: emailResult.delivered },
     });
 
     res.json({
       success: true,
       code,
-      message: `Authorization code ${code} sent to ${user.email}.`,
+      assignedRole: roleToSet,
+      message: `Authorization code ${code} sent to ${user.email} (Role: ${roleToSet.toUpperCase()}).`,
       delivered: emailResult.delivered,
     });
   } catch (err) {
     console.error('[Admin Dispatch Code Error]', err);
     res.status(500).json({ error: 'Failed to dispatch authorization code.' });
+  }
+});
+
+/**
+ * POST /api/auth/set-user-role
+ * Allows Administrator to toggle any user role between Document Owner and Viewer.
+ */
+router.post('/set-user-role', authenticateToken, async (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Access Denied: Only administrators can update roles.' });
+  }
+
+  const { userId, role } = req.body;
+  if (!['owner', 'viewer'].includes(role)) {
+    return res.status(400).json({ error: 'Role must be either owner or viewer.' });
+  }
+
+  try {
+    const updateRes = await query('UPDATE users SET role = $1 WHERE id = $2 RETURNING id, name, email, role', [role, userId]);
+    if (!updateRes.rows || updateRes.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found.' });
+    }
+
+    await recordEvent({
+      actor_id: req.user.id,
+      actor_email: req.user.email,
+      action: 'ADMIN_UPDATED_USER_ROLE',
+      target_resource: `user:${userId}`,
+      details: { newRole: role },
+    });
+
+    res.json({ success: true, user: updateRes.rows[0], message: `User role updated to ${role}.` });
+  } catch (err) {
+    console.error('[Set Role Error]', err);
+    res.status(500).json({ error: 'Failed to update user role.' });
   }
 });
 

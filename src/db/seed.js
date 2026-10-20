@@ -9,6 +9,7 @@ const { recordEvent } = require('../services/auditService');
 // Stable UUIDs for consistent testing and seeding
 const SEED_IDS = {
   admin: '11111111-1111-1111-1111-111111111111',
+  guardfileAdmin: '00000000-0000-0000-0000-000000000001',
   alice: '22222222-2222-2222-2222-222222222222',
   bob: '33333333-3333-3333-3333-333333333333',
   charlie: '44444444-4444-4444-4444-444444444444',
@@ -22,11 +23,13 @@ async function seed() {
 
   const salt = await bcrypt.genSalt(10);
   const adminHash = await bcrypt.hash('AdminPassword123!', salt);
+  const guardfileAdminHash = await bcrypt.hash('Arshad@1234', salt);
   const ownerHash = await bcrypt.hash('OwnerPassword123!', salt);
   const viewerHash = await bcrypt.hash('ViewerPassword123!', salt);
 
   // 1. Upsert Users (Idempotent)
   const users = [
+    { id: SEED_IDS.guardfileAdmin, name: 'GuardFile Administrator', email: 'guardfile@gmail.com', phone: '+91 9876543210', hash: guardfileAdminHash, role: 'admin' },
     { id: SEED_IDS.admin, name: 'System Administrator', email: 'admin@trustvault.local', phone: '+15550000001', hash: adminHash, role: 'admin' },
     { id: SEED_IDS.alice, name: 'Alice (Executive HR)', email: 'alice@trustvault.local', phone: '+15550000002', hash: ownerHash, role: 'owner' },
     { id: SEED_IDS.bob, name: 'Bob (Chief Architect)', email: 'bob@trustvault.local', phone: '+15550000003', hash: ownerHash, role: 'owner' },

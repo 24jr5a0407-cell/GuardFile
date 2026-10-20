@@ -4,6 +4,44 @@ let currentUser = null;
 let pendingRegistration = null; // { userId, email, phone, name, role }
 let pending2FA = null;
 
+/**
+ * Universal Toast Notification Helper
+ */
+function showToast(title, message, type = 'info') {
+  const toast = document.getElementById('toast');
+  const toastTitle = document.getElementById('toast-title');
+  const toastMsg = document.getElementById('toast-message');
+  const toastIcon = document.getElementById('toast-icon');
+
+  if (!toast) return;
+
+  if (toastTitle) toastTitle.textContent = title;
+  if (toastMsg) toastMsg.textContent = message;
+
+  if (toastIcon) {
+    if (type === 'success') {
+      toastIcon.innerHTML = '<i data-lucide="check-circle" class="w-5 h-5 text-emerald-400"></i>';
+    } else if (type === 'error') {
+      toastIcon.innerHTML = '<i data-lucide="alert-triangle" class="w-5 h-5 text-rose-400"></i>';
+    } else {
+      toastIcon.innerHTML = '<i data-lucide="info" class="w-5 h-5 text-blue-400"></i>';
+    }
+  }
+
+  try {
+    if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
+  } catch (e) {}
+
+  toast.classList.remove('hidden');
+  toast.style.display = 'flex';
+
+  setTimeout(() => {
+    toast.classList.add('hidden');
+    toast.style.display = 'none';
+  }, 4500);
+}
+window.showToast = showToast;
+
 function getToken() {
   return localStorage.getItem('trustvault_token');
 }
@@ -179,6 +217,18 @@ function renderAuthHeader() {
 }
 
 /**
+ * Secret Admin Login autofill helper
+ */
+function fillAdminCredentials() {
+  showPortalAuthTab('login');
+  const emailInput = document.getElementById('portal-login-email');
+  const passwordInput = document.getElementById('portal-login-password');
+  if (emailInput) emailInput.value = 'guardfile@gmail.com';
+  if (passwordInput) passwordInput.value = 'Arshad@1234';
+  showToast('Admin Credentials Ready', 'Filled: guardfile@gmail.com / Arshad@1234', 'info');
+}
+
+/**
  * Portal View Tab Switching (Sign In vs Register vs OTP vs Admin Code)
  */
 function showPortalAuthTab(tab) {
@@ -190,30 +240,35 @@ function showPortalAuthTab(tab) {
   const tabBtnRegister = document.getElementById('portal-tab-btn-register');
   const tabHeader = document.getElementById('auth-portal-tab-header');
 
-  loginView?.classList.add('hidden');
-  registerView?.classList.add('hidden');
-  otpView?.classList.add('hidden');
-  adminCodeView?.classList.add('hidden');
+  // Explicitly hide all panels using both classes and inline styles
+  [loginView, registerView, otpView, adminCodeView].forEach(el => {
+    if (el) {
+      el.classList.add('hidden');
+      el.style.setProperty('display', 'none', 'important');
+    }
+  });
 
   if (tab === 'login') {
-    tabHeader?.classList.remove('hidden');
-    loginView?.classList.remove('hidden');
+    if (tabHeader) { tabHeader.classList.remove('hidden'); tabHeader.style.display = 'flex'; }
+    if (loginView) { loginView.classList.remove('hidden'); loginView.style.setProperty('display', 'flex', 'important'); }
     tabBtnLogin?.classList.add('active');
     tabBtnRegister?.classList.remove('active');
   } else if (tab === 'register') {
-    tabHeader?.classList.remove('hidden');
-    registerView?.classList.remove('hidden');
+    if (tabHeader) { tabHeader.classList.remove('hidden'); tabHeader.style.display = 'flex'; }
+    if (registerView) { registerView.classList.remove('hidden'); registerView.style.setProperty('display', 'flex', 'important'); }
     tabBtnRegister?.classList.add('active');
     tabBtnLogin?.classList.remove('active');
   } else if (tab === 'otp') {
-    tabHeader?.classList.add('hidden');
-    otpView?.classList.remove('hidden');
+    if (tabHeader) { tabHeader.classList.add('hidden'); tabHeader.style.display = 'none'; }
+    if (otpView) { otpView.classList.remove('hidden'); otpView.style.setProperty('display', 'flex', 'important'); }
   } else if (tab === 'admin-code') {
-    tabHeader?.classList.add('hidden');
-    adminCodeView?.classList.remove('hidden');
+    if (tabHeader) { tabHeader.classList.add('hidden'); tabHeader.style.display = 'none'; }
+    if (adminCodeView) { adminCodeView.classList.remove('hidden'); adminCodeView.style.setProperty('display', 'flex', 'important'); }
   }
 
-  if (window.lucide) lucide.createIcons();
+  try {
+    if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
+  } catch (err) {}
 }
 
 function openLoginModal(initialTab = 'login') {
@@ -221,9 +276,7 @@ function openLoginModal(initialTab = 'login') {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-function closeLoginModal() {
-  // Obsolete helper maintained for backwards compatibility
-}
+function closeLoginModal() {}
 
 function showAuthTab(tab) {
   showPortalAuthTab(tab);
@@ -809,9 +862,13 @@ async function loadPendingApprovals() {
           </td>
           <td class="py-3 px-4 font-mono text-slate-700">${u.phone || 'N/A'}</td>
           <td class="py-3 px-4">
-            <span class="px-2 py-0.5 text-[10px] font-bold uppercase rounded-md ${u.role === 'owner' ? 'bg-blue-100 text-blue-800' : 'bg-emerald-100 text-emerald-800'}">
-              ${u.role}
-            </span>
+            <select
+              id="role-select-${u.id}"
+              class="px-2 py-1 text-xs font-semibold rounded-lg border border-slate-200 bg-white text-slate-800 focus:ring-1 focus:ring-purple-500 cursor-pointer shadow-xs"
+            >
+              <option value="owner" ${u.role === 'owner' ? 'selected' : ''}>Document Owner</option>
+              <option value="viewer" ${u.role === 'viewer' ? 'selected' : ''}>Document Viewer</option>
+            </select>
           </td>
           <td class="py-3 px-4">${statusBadge}</td>
           <td class="py-3 px-4">
@@ -824,7 +881,7 @@ async function loadPendingApprovals() {
                 placeholder="TV-123456"
               />
               <button
-                onclick="handleAdminDispatchCode('${u.id}', 'code-input-${u.id}')"
+                onclick="handleAdminDispatchCode('${u.id}', 'code-input-${u.id}', 'role-select-${u.id}')"
                 class="px-3 py-1 text-xs font-semibold text-white bg-purple-600 hover:bg-purple-700 rounded-lg shadow-xs flex items-center gap-1 transition cursor-pointer"
               >
                 <i data-lucide="send" class="w-3 h-3"></i> Send Code
@@ -835,7 +892,9 @@ async function loadPendingApprovals() {
       `;
     }).join('');
 
-    if (window.lucide) lucide.createIcons();
+    try {
+      if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
+    } catch (e) {}
   } catch (err) {
     console.error('Error rendering approvals:', err);
     tbody.innerHTML = `<tr><td colspan="5" class="py-6 text-center text-rose-500">Error: ${err.message}</td></tr>`;
@@ -843,14 +902,16 @@ async function loadPendingApprovals() {
 }
 
 /**
- * Administrator Dispatches Authorization Code to User's Email
+ * Administrator Dispatches Authorization Code to User's Email and Assigns Role
  */
-async function handleAdminDispatchCode(userId, inputId) {
+async function handleAdminDispatchCode(userId, inputId, roleSelectId) {
   const token = getToken();
   if (!token) return;
 
   const codeInput = document.getElementById(inputId);
+  const roleSelect = roleSelectId ? document.getElementById(roleSelectId) : null;
   const customCode = codeInput ? codeInput.value : '';
+  const assignedRole = roleSelect ? roleSelect.value : undefined;
 
   try {
     const res = await fetch('/api/auth/admin-dispatch-code', {
@@ -859,7 +920,7 @@ async function handleAdminDispatchCode(userId, inputId) {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ userId, customCode }),
+      body: JSON.stringify({ userId, customCode, assignedRole }),
     });
 
     const data = await res.json();

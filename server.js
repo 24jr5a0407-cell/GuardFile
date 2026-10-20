@@ -167,8 +167,8 @@ async function startServer() {
 }
 
 // In serverless environments (e.g. Vercel), the platform wraps Express directly as a function;
-// only start standard listening if running as a persistent Node server.
-if (!process.env.VERCEL && !process.env.AWS_LAMBDA_FUNCTION_NAME && process.env.NODE_ENV !== 'test') {
+// only start standard listening if running directly as a standalone Node server.
+if (require.main === module) {
   startServer();
 }
 

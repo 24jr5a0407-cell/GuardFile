@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TrustVault — Zero-Trust Document Sharing & Immutable Audit Trail</title>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+          colors: {
+            brand: {
+              50: '#f0f7ff',
+              100: '#e0effe',
+              500: '#2563eb',
+              600: '#1d4ed8',
+              700: '#1e40af',
+              900: '#0f172a',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased min-h-screen flex flex-col font-sans">
+
+  <!-- Top App Navigation Bar -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+      <!-- Logo & Branding -->
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20">
+          <i data-lucide="shield-check" class="w-6 h-6"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="text-xl font-bold tracking-tight text-slate-900">TrustVault</span>
+            <span class="text-[11px] font-semibold uppercase px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 border border-blue-200">Zero-Trust</span>
+          </div>
+          <p class="text-xs text-slate-500 hidden sm:block">Cryptographically Proven Document Security</p>
+        </div>
+      </div>
+
+      <!-- Quick Demo Role Switcher (For Evaluators & Judges) -->
+      <div class="hidden lg:flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200">
+        <span class="text-xs font-semibold px-2 text-slate-500 flex items-center gap-1">
+          <i data-lucide="zap" class="w-3.5 h-3.5 text-amber-500"></i> Judge Switcher:
+        </span>
+        <button onclick="quickLogin('admin@trustvault.local', 'AdminPassword123!')" id="role-btn-admin" class="px-2.5 py-1 text-xs font-medium rounded-lg text-slate-700 hover:bg-white hover:shadow-xs transition">
+          Admin
+        </button>
+        <button onclick="quickLogin('alice@trustvault.local', 'OwnerPassword123!')" id="role-btn-alice" class="px-2.5 py-1 text-xs font-medium rounded-lg text-slate-700 hover:bg-white hover:shadow-xs transition">
+          Alice (Owner)
+        </button>
+        <button onclick="quickLogin('bob@trustvault.local', 'OwnerPassword123!')" id="role-btn-bob" class="px-2.5 py-1 text-xs font-medium rounded-lg text-slate-700 hover:bg-white hover:shadow-xs transition">
+          Bob (Owner)
+        </button>
+        <button onclick="quickLogin('charlie@trustvault.local', 'ViewerPassword123!')" id="role-btn-charlie" class="px-2.5 py-1 text-xs font-medium rounded-lg text-slate-700 hover:bg-white hover:shadow-xs transition">
+          Charlie (Viewer)
+        </button>
+      </div>
+
+      <!-- User Session Pill & Actions -->
+      <div class="flex items-center gap-3" id="auth-header-container">
+        <!-- Rendered dynamically by auth.js -->
+        <button onclick="openLoginModal()" class="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-xl hover:bg-blue-700 shadow-sm transition">
+          Sign In
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full flex flex-col gap-6">
+
+    <!-- Subheader Navigation Tabs -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
+      <nav class="flex space-x-2" aria-label="Tabs">
+        <button onclick="switchTab('documents')" id="tab-btn-documents" class="tab-btn active px-4 py-2 text-sm font-semibold rounded-xl bg-blue-50 text-blue-700 border border-blue-200 flex items-center gap-2">
+          <i data-lucide="files" class="w-4 h-4"></i> Secured Documents
+        </button>
+        <button onclick="switchTab('audit')" id="tab-btn-audit" class="tab-btn px-4 py-2 text-sm font-semibold rounded-xl text-slate-600 hover:bg-slate-100 flex items-center gap-2">
+          <i data-lucide="history" class="w-4 h-4"></i> Immutable Audit Trail
+        </button>
+        <button onclick="switchTab('threats')" id="tab-btn-threats" class="tab-btn px-4 py-2 text-sm font-semibold rounded-xl text-slate-600 hover:bg-slate-100 flex items-center gap-2">
+          <i data-lucide="shield-alert" class="w-4 h-4"></i> Threat Model & Proofs
+        </button>
+      </nav>
+
+      <div class="flex items-center gap-2">
+        <button onclick="verifyCryptographicChain()" class="px-3.5 py-2 text-xs font-semibold rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 flex items-center gap-1.5 transition">
+          <i data-lucide="check-circle" class="w-4 h-4 text-emerald-600"></i>
+          Verify Ledger Chain
+        </button>
+        <button id="btn-open-upload" onclick="openUploadModal()" class="px-4 py-2 text-sm font-semibold rounded-xl bg-blue-600 text-white hover:bg-blue-700 shadow-sm flex items-center gap-1.5 transition">
+          <i data-lucide="upload" class="w-4 h-4"></i> Upload Document
+        </button>
+      </div>
+    </div>
+
+    <!-- Live Metrics Overview Cards -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4" id="stats-container">
+      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-4">
+        <div class="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600">
+          <i data-lucide="file-lock" class="w-6 h-6"></i>
+        </div>
+        <div>
+          <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Total Documents</p>
+          <h3 class="text-2xl font-extrabold text-slate-900" id="stat-total-docs">-</h3>
+        </div>
+      </div>
+
+      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-4">
+        <div class="w-12 h-12 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600">
+          <i data-lucide="key" class="w-6 h-6"></i>
+        </div>
+        <div>
+          <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Active Grants</p>
+          <h3 class="text-2xl font-extrabold text-emerald-600" id="stat-active-grants">-</h3>
+        </div>
+      </div>
+
+      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-4">
+        <div class="w-12 h-12 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600">
+          <i data-lucide="lock" class="w-6 h-6"></i>
+        </div>
+        <div>
+          <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Instant Revocations</p>
+          <h3 class="text-2xl font-extrabold text-amber-600" id="stat-revoked-grants">-</h3>
+        </div>
+      </div>
+
+      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-4">
+        <div class="w-12 h-12 rounded-xl bg-rose-50 flex items-center justify-center text-rose-600">
+          <i data-lucide="shield-x" class="w-6 h-6"></i>
+        </div>
+        <div>
+          <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Refused Attempts</p>
+          <h3 class="text-2xl font-extrabold text-rose-600" id="stat-denied-attempts">-</h3>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 1: Documents View -->
+    <div id="view-documents" class="tab-view flex flex-col gap-4">
+      <!-- Search & Filters Toolbar -->
+      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-col md:flex-row gap-3 items-center justify-between">
+        <div class="relative w-full md:w-96">
+          <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3.5 top-3"></i>
+          <input
+            type="text"
+            id="search-input"
+            oninput="handleSearch()"
+            placeholder="Search by title, filename, or owner..."
+            class="w-full pl-10 pr-4 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:bg-white transition"
+          />
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2 w-full md:w-auto">
+          <!-- Category Filter -->
+          <select id="filter-category" onchange="handleSearch()" class="px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-blue-500 text-slate-700">
+            <option value="">All Categories</option>
+            <option value="HR / Payroll">HR / Payroll</option>
+            <option value="Engineering">Engineering</option>
+            <option value="Finance">Finance</option>
+            <option value="Legal">Legal</option>
+            <option value="Confidential">Confidential</option>
+          </select>
+
+          <!-- Refresh Button -->
+          <button onclick="loadDocuments()" class="p-2 text-slate-600 hover:bg-slate-100 rounded-xl border border-slate-200 transition" title="Refresh">
+            <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Zero-Trust Document Grid / List -->
+      <div id="documents-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <!-- Rendered by documents.js -->
+        <div class="col-span-full py-16 text-center text-slate-400">
+          <i data-lucide="loader" class="w-8 h-8 animate-spin mx-auto mb-2 text-blue-600"></i>
+          Loading encrypted documents...
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 2: Immutable Audit Trail View -->
+    <div id="view-audit" class="tab-view hidden flex flex-col gap-4">
+      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-col md:flex-row gap-3 items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-xl bg-slate-900 text-white flex items-center justify-center">
+            <i data-lucide="database" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h2 class="text-sm font-bold text-slate-900">Cryptographically Chained Audit Ledger</h2>
+            <p class="text-xs text-slate-500">Every upload, access attempt (success or denied), and revocation is permanently sealed.</p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <!-- Status Filter -->
+          <select id="audit-filter-status" onchange="loadAuditLogs()" class="px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500">
+            <option value="">All Statuses</option>
+            <option value="SUCCESS">SUCCESS only</option>
+            <option value="DENIED">DENIED only</option>
+          </select>
+
+          <!-- Action Filter -->
+          <select id="audit-filter-action" onchange="loadAuditLogs()" class="px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500">
+            <option value="">All Actions</option>
+            <option value="UPLOAD">UPLOAD</option>
+            <option value="READ_SUCCESS">READ_SUCCESS</option>
+            <option value="READ_DENIED">READ_DENIED</option>
+            <option value="GRANT">GRANT</option>
+            <option value="REVOKE">REVOKE</option>
+            <option value="DELETE">DELETE</option>
+          </select>
+
+          <button onclick="loadAuditLogs()" class="p-2 text-slate-600 hover:bg-slate-100 rounded-xl border border-slate-200 transition">
+            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Audit Logs Table -->
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-50 text-slate-600 uppercase font-semibold border-b border-slate-200">
+              <tr>
+                <th class="py-3 px-4">Timestamp</th>
+                <th class="py-3 px-4">Action</th>
+                <th class="py-3 px-4">Actor</th>
+                <th class="py-3 px-4">Target Resource</th>
+                <th class="py-3 px-4">IP Address</th>
+                <th class="py-3 px-4">Status</th>
+                <th class="py-3 px-4">Block Link (SHA-256)</th>
+              </tr>
+            </thead>
+            <tbody id="audit-table-body" class="divide-y divide-slate-100 text-slate-700 font-mono">
+              <!-- Rendered by audit.js -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 3: Threat Model & Security Guarantees View -->
+    <div id="view-threats" class="tab-view hidden flex flex-col gap-6">
+      <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs">
+        <div class="flex items-center gap-3 mb-4">
+          <div class="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
+            <i data-lucide="shield-alert" class="w-6 h-6"></i>
+          </div>
+          <div>
+            <h2 class="text-lg font-bold text-slate-900">Security Architecture & Threat Defense Matrix</h2>
+            <p class="text-xs text-slate-500">Every defense implemented in TrustVault mapped against attack vectors and automated verification.</p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <!-- Threat Card 1 -->
+          <div class="p-4 rounded-xl border border-slate-200 bg-slate-50/50">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-bold uppercase tracking-wider text-rose-600">Vector: IDOR / Broken Object Authorization</span>
+              <span class="px-2 py-0.5 text-[10px] font-bold bg-emerald-100 text-emerald-800 rounded-full">Mitigated</span>
+            </div>
+            <p class="text-xs text-slate-600 mb-2"><strong>Attack:</strong> Tampering with document UUID in <code class="bg-slate-200 px-1 py-0.5 rounded">/api/documents/:id/download</code> to access other users' confidential documents.</p>
+            <p class="text-xs text-slate-700"><strong>Zero-Trust Defense:</strong> Real-time database ACL lookup on every single request. Lack of unrevoked grant blocks with 403 Forbidden and writes <code class="text-rose-600 font-mono">READ_DENIED</code> with client IP to audit trail.</p>
+          </div>
+
+          <!-- Threat Card 2 -->
+          <div class="p-4 rounded-xl border border-slate-200 bg-slate-50/50">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-bold uppercase tracking-wider text-rose-600">Vector: Stale Session / Instant Revocation Window</span>
+              <span class="px-2 py-0.5 text-[10px] font-bold bg-emerald-100 text-emerald-800 rounded-full">Mitigated</span>
+            </div>
+            <p class="text-xs text-slate-600 mb-2"><strong>Attack:</strong> User accesses file after owner clicks "Revoke", relying on cached permissions or signed URLs.</p>
+            <p class="text-xs text-slate-700"><strong>Zero-Trust Defense:</strong> No file permission is ever stored in JWT. Revocation updates <code class="font-mono">is_revoked = TRUE</code> in DB, instantly blocking requests in &lt;1 millisecond.</p>
+          </div>
+
+          <!-- Threat Card 3 -->
+          <div class="p-4 rounded-xl border border-slate-200 bg-slate-50/50">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-bold uppercase tracking-wider text-rose-600">Vector: MIME-Type & Magic Byte Spoofing</span>
+              <span class="px-2 py-0.5 text-[10px] font-bold bg-emerald-100 text-emerald-800 rounded-full">Mitigated</span>
+            </div>
+            <p class="text-xs text-slate-600 mb-2"><strong>Attack:</strong> Renaming executable <code class="bg-slate-200 px-1 py-0.5 rounded">malicious.exe</code> to <code class="bg-slate-200 px-1 py-0.5 rounded">contract.pdf</code> to bypass extension filter.</p>
+            <p class="text-xs text-slate-700"><strong>Zero-Trust Defense:</strong> Server-side magic bytes validation directly inspects header bytes (%PDF-, PNG magic, MZ executable headers) before storage.</p>
+          </div>
+
+          <!-- Threat Card 4 -->
+          <div class="p-4 rounded-xl border border-slate-200 bg-slate-50/50">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-bold uppercase tracking-wider text-rose-600">Vector: Audit Trail Tampering</span>
+              <span class="px-2 py-0.5 text-[10px] font-bold bg-emerald-100 text-emerald-800 rounded-full">Mitigated</span>
+            </div>
+            <p class="text-xs text-slate-600 mb-2"><strong>Attack:</strong> Insider or compromised admin alters or deletes audit logs to hide an unauthorized download.</p>
+            <p class="text-xs text-slate-700"><strong>Zero-Trust Defense:</strong> PostgreSQL database trigger blocks UPDATE/DELETE with exception. SHA-256 cryptographic hash chaining invalidates the entire ledger if a single bit is changed.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- MODAL: Upload Document -->
+  <div id="modal-upload" class="modal-backdrop hidden fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-lg w-full p-6 animate-scale-up">
+      <div class="flex items-center justify-between pb-4 border-b border-slate-100 mb-4">
+        <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+          <i data-lucide="upload-cloud" class="w-5 h-5 text-blue-600"></i> Upload Secured Document
+        </h3>
+        <button onclick="closeUploadModal()" class="text-slate-400 hover:text-slate-600">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="upload-form" onsubmit="handleUploadSubmit(event)" class="flex flex-col gap-4">
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Document Title *</label>
+          <input type="text" id="upload-title" required placeholder="e.g. Q3 Audited Financial Statement" class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-hidden" />
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Security Category</label>
+          <select id="upload-category" class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-hidden">
+            <option value="HR / Payroll">HR / Payroll</option>
+            <option value="Engineering">Engineering</option>
+            <option value="Finance">Finance</option>
+            <option value="Legal">Legal</option>
+            <option value="Confidential">Confidential</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Select File (Strict validation: PDF, DOCX, XLSX, TXT, PNG, JPG)</label>
+          <input type="file" id="upload-file" required class="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
+        </div>
+
+        <div id="upload-error" class="hidden p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs"></div>
+
+        <div class="flex items-center justify-end gap-2 pt-4 border-t border-slate-100">
+          <button type="button" onclick="closeUploadModal()" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl">Cancel</button>
+          <button type="submit" id="btn-submit-upload" class="px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-xs flex items-center gap-1.5">
+            <i data-lucide="shield" class="w-4 h-4"></i> Seal & Upload
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: Manage Document Permissions -->
+  <div id="modal-permissions" class="modal-backdrop hidden fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-xl w-full p-6 animate-scale-up flex flex-col gap-4">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div>
+          <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+            <i data-lucide="user-check" class="w-5 h-5 text-blue-600"></i> Manage Access & Revocation
+          </h3>
+          <p class="text-xs text-slate-500" id="perm-modal-doc-title">-</p>
+        </div>
+        <button onclick="closePermissionsModal()" class="text-slate-400 hover:text-slate-600">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Grant Access to Named User Form -->
+      <form id="grant-form" onsubmit="handleGrantSubmit(event)" class="bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col gap-3">
+        <h4 class="text-xs font-bold text-slate-800 uppercase tracking-wider">Grant Access to Named Person</h4>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <div class="sm:col-span-2">
+            <select id="grant-user-select" required class="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg">
+              <option value="">Select recipient user...</option>
+            </select>
+          </div>
+          <div>
+            <select id="grant-level-select" class="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg">
+              <option value="read">Read Only</option>
+              <option value="edit">Read & Edit</option>
+            </select>
+          </div>
+        </div>
+        <button type="submit" class="self-end px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition">
+          Grant Permission
+        </button>
+      </form>
+
+      <!-- Active Grants Roster -->
+      <div>
+        <h4 class="text-xs font-bold text-slate-800 uppercase tracking-wider mb-2">Current Access Grants</h4>
+        <div id="permissions-roster-list" class="flex flex-col gap-2 max-h-56 overflow-y-auto">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: In-Browser Document Preview -->
+  <div id="modal-preview" class="modal-backdrop hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-4xl w-full h-[80vh] flex flex-col overflow-hidden animate-scale-up">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50">
+        <div class="flex items-center gap-2">
+          <i data-lucide="file-text" class="w-5 h-5 text-blue-600"></i>
+          <span class="text-sm font-bold text-slate-900" id="preview-modal-title">Document Preview</span>
+        </div>
+        <button onclick="closePreviewModal()" class="text-slate-400 hover:text-slate-600">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <div class="flex-1 bg-slate-100 p-4 flex items-center justify-center overflow-auto" id="preview-container">
+        <!-- Rendered frame or text -->
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: Login / OTP -->
+  <div id="modal-auth" class="modal-backdrop hidden fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-sm w-full p-6 animate-scale-up">
+      <div class="text-center mb-6">
+        <div class="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center mx-auto mb-3 shadow-md shadow-blue-500/20">
+          <i data-lucide="shield-check" class="w-7 h-7"></i>
+        </div>
+        <h3 class="text-lg font-bold text-slate-900" id="auth-modal-title">TrustVault Login</h3>
+        <p class="text-xs text-slate-500" id="auth-modal-subtitle">Authenticate to access secured vaults</p>
+      </div>
+
+      <!-- Login Form Step -->
+      <form id="login-form" onsubmit="handleLoginSubmit(event)" class="flex flex-col gap-4">
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Email</label>
+          <input type="email" id="login-email" required class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-hidden" placeholder="name@trustvault.local" />
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Password</label>
+          <input type="password" id="login-password" required class="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-hidden" placeholder="••••••••••••" />
+        </div>
+        <div class="flex items-center gap-2">
+          <input type="checkbox" id="login-require-2fa" class="rounded text-blue-600 focus:ring-blue-500" />
+          <label for="login-require-2fa" class="text-xs text-slate-600">Require OTP Email 2FA</label>
+        </div>
+        <div id="login-error" class="hidden p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs"></div>
+        <button type="submit" class="w-full py-2.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-xs transition">
+          Sign In
+        </button>
+      </form>
+
+      <!-- OTP Verification Step -->
+      <form id="otp-form" onsubmit="handleOtpSubmit(event)" class="hidden flex flex-col gap-4">
+        <div class="text-center p-3 bg-blue-50 rounded-xl border border-blue-100">
+          <p class="text-xs text-blue-800" id="otp-status-text">Security code dispatched to your email.</p>
+          <p class="text-[11px] font-mono text-blue-600 mt-1" id="otp-dev-hint"></p>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Enter 6-Digit Code</label>
+          <input type="text" id="otp-code-input" maxlength="6" required class="w-full text-center tracking-widest font-mono text-2xl py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-hidden" placeholder="123456" />
+        </div>
+        <div id="otp-error" class="hidden p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs"></div>
+        <button type="submit" class="w-full py-2.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-xs transition">
+          Verify & Access Vault
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Notification Toast Container -->
+  <div id="toast" class="fixed bottom-6 right-6 z-50 hidden max-w-sm w-full bg-slate-900 text-white p-4 rounded-2xl shadow-xl flex items-center gap-3 animate-slide-up border border-slate-800">
+    <div id="toast-icon" class="text-emerald-400"></div>
+    <div class="flex-1 text-xs">
+      <p class="font-bold" id="toast-title">Notice</p>
+      <p class="text-slate-300" id="toast-message"></p>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="/js/auth.js"></script>
+  <script src="/js/documents.js"></script>
+  <script src="/js/audit.js"></script>
+  <script src="/js/app.js"></script>
+  <script>
+    // Initialize Lucide icons
+    document.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+    });
+  </script>
+</body>
+</html>

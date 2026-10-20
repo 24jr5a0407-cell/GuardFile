@@ -100,3 +100,11 @@ CREATE TRIGGER trg_audit_logs_immutable
 BEFORE UPDATE OR DELETE ON audit_logs
 FOR EACH ROW
 EXECUTE FUNCTION prevent_audit_log_tampering();
+
+-- ==============================================================================
+-- Supabase Row Level Security (RLS) Enablement
+-- ==============================================================================
+ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.documents ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.document_permissions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;

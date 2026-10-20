@@ -63,8 +63,8 @@ app.use('/api/documents', documentRoutes);
 app.use('/api/permissions', permissionRoutes);
 app.use('/api/audit', auditRoutes);
 
-// Health check endpoint
-app.get('/api/health', (req, res) => {
+// Health check endpoints
+app.get(['/api/health', '/healthz'], (req, res) => {
   res.json({
     status: 'ONLINE',
     service: 'TrustVault Zero-Trust Platform',

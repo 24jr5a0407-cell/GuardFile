@@ -165,10 +165,10 @@ router.post('/resend-registration-otp', async (req, res) => {
   try {
     let user;
     if (userId) {
-      const result = await query('SELECT id, email, name FROM users WHERE id = $1', [userId]);
+      const result = await query('SELECT id, email, name, otp_expires_at FROM users WHERE id = $1', [userId]);
       user = result.rows && result.rows[0];
     } else {
-      const result = await query('SELECT id, email, name FROM users WHERE LOWER(email) = LOWER($1)', [email.trim()]);
+      const result = await query('SELECT id, email, name, otp_expires_at FROM users WHERE LOWER(email) = LOWER($1)', [email.trim()]);
       user = result.rows && result.rows[0];
     }
 
@@ -176,12 +176,26 @@ router.post('/resend-registration-otp', async (req, res) => {
       return res.status(404).json({ error: 'User record not found.' });
     }
 
+    // Rate-limiting: prevent resending more frequently than every 15 seconds
+    if (user.otp_expires_at) {
+      const msLeft = new Date(user.otp_expires_at).getTime() - Date.now();
+      if (msLeft > 285000) {
+        const waitSec = Math.ceil((msLeft - 285000) / 1000);
+        return res.status(429).json({
+          error: `Please wait ${waitSec} second(s) before requesting another verification code.`,
+          waitSec,
+        });
+      }
+    }
+
     const otpResult = await sendOtp(user.id, user.email, 'Account Registration Verification (Resend)');
 
     res.json({
       success: true,
-      message: `A fresh 6-digit verification code has been dispatched to ${user.email}.`,
+      message: `A fresh 6-digit verification code has been dispatched to ${user.email}. Please check your Inbox and Spam folders.`,
+      email: user.email,
       delivered: otpResult.delivered,
+      cooldownSeconds: 30,
     });
   } catch (err) {
     console.error('[Resend OTP Error]', err);

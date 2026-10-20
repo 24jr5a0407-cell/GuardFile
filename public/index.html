@@ -399,12 +399,23 @@
           </button>
         </form>
 
-        <div class="flex items-center justify-between text-xs text-slate-500 pt-1">
-          <button type="button" onclick="showPortalAuthTab('login')" class="hover:text-slate-800 cursor-pointer">
-            ← Back to Sign In
+        <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 text-[11px] text-slate-600 flex items-start gap-2">
+          <i data-lucide="info" class="w-4 h-4 text-blue-600 shrink-0 mt-0.5"></i>
+          <span>Check your <strong>Inbox</strong> and <strong>Spam / Junk</strong> folder. Email delivery may take 10-30 seconds.</span>
+        </div>
+
+        <div class="flex items-center justify-between text-xs text-slate-500 pt-2 border-t border-slate-100">
+          <button type="button" onclick="showPortalAuthTab('register')" class="text-slate-500 hover:text-slate-800 cursor-pointer flex items-center gap-1 font-medium">
+            ← Change Email
           </button>
-          <button type="button" onclick="resendRegistrationOtp()" class="text-blue-600 hover:text-blue-800 font-semibold cursor-pointer">
-            Resend Code
+          <button 
+            type="button" 
+            id="portal-otp-resend-btn" 
+            onclick="triggerResendOtp()" 
+            class="text-blue-600 hover:text-blue-800 font-semibold cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1 transition"
+          >
+            <i data-lucide="refresh-cw" class="w-3.5 h-3.5" id="portal-otp-resend-icon"></i>
+            <span id="portal-otp-resend-label">Resend Code</span>
           </button>
         </div>
       </div>

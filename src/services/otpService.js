@@ -34,13 +34,21 @@ async function sendOtp(userId, email, purpose = 'Login Verification') {
     </div>
   `;
 
+  const emailText = `Your TrustVault verification code for ${purpose} is: ${otp}\n\nThis verification code expires in 5 minutes. Never share this code with anyone.\n\nIf you did not request this verification code, please ignore this email.`;
+
   let delivered = false;
   try {
     const info = await transporter.sendMail({
       from: `"TrustVault Security" <${smtpUser}>`,
       to: email,
-      subject: `[TrustVault] Your Security Verification Code: ${otp}`,
+      subject: `Your TrustVault Security Verification Code: ${otp}`,
+      text: emailText,
       html: emailHtml,
+      headers: {
+        'X-Priority': '1 (Highest)',
+        'X-MSMail-Priority': 'High',
+        'Importance': 'High',
+      },
     });
     console.log(`[OTP Service] Email dispatched to ${email}: ${info.messageId}`);
     delivered = true;
@@ -164,12 +172,19 @@ async function sendAdminApprovalCode(userEmail, code, userName) {
   `;
 
   let delivered = false;
+  const emailText = `Hello ${userName || 'User'},\n\nYour account has been approved by the Administrator. Your Access Authorization Code is: ${code}\n\nPlease enter this code on the verification screen to activate your dashboard.`;
   try {
     const info = await transporter.sendMail({
       from: `"TrustVault Security" <${smtpUser}>`,
       to: userEmail,
-      subject: `[TrustVault] Your Admin Access Authorization Code: ${code}`,
+      subject: `Your TrustVault Access Authorization Code: ${code}`,
+      text: emailText,
       html: emailHtml,
+      headers: {
+        'X-Priority': '1 (Highest)',
+        'X-MSMail-Priority': 'High',
+        'Importance': 'High',
+      },
     });
     console.log(`[Admin Code] Email dispatched to ${userEmail}: ${info.messageId}`);
     delivered = true;

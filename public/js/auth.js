@@ -330,7 +330,7 @@ function handleAccountStatusResponse(data) {
   if (data.account_status === 'PENDING_OTP' || data.requireRegistrationOTP || data.requireOTP) {
     showPortalAuthTab('otp');
     const emailEl = document.getElementById('portal-otp-target-email');
-    if (emailEl) emailEl.textContent = data.email;
+    if (emailEl) emailEl.textContent = data.email || (pendingRegistration && pendingRegistration.email) || '';
 
     const statusEl = document.getElementById('portal-otp-status-text');
     if (statusEl) statusEl.textContent = data.message || 'Verification code dispatched to your email.';
@@ -345,6 +345,7 @@ function handleAccountStatusResponse(data) {
       codeInput.value = '';
       setTimeout(() => codeInput.focus(), 150);
     }
+    startResendCooldown(30);
   } else if (data.account_status === 'PENDING_ADMIN_CODE' || data.pendingAdminCode) {
     showPortalAuthTab('admin-code');
     const userEl = document.getElementById('portal-admin-code-user-info');
@@ -690,10 +691,46 @@ async function handlePortalOtpSubmit(e) {
   return false;
 }
 
+let resendTimerInterval = null;
+let resendSecondsRemaining = 0;
+
+function startResendCooldown(seconds = 30) {
+  const resendBtn = document.getElementById('portal-otp-resend-btn');
+  const resendLabel = document.getElementById('portal-otp-resend-label');
+  const resendIcon = document.getElementById('portal-otp-resend-icon');
+  if (!resendBtn || !resendLabel) return;
+
+  clearInterval(resendTimerInterval);
+  resendSecondsRemaining = seconds;
+  resendBtn.disabled = true;
+
+  const updateUI = () => {
+    if (resendSecondsRemaining > 0) {
+      resendLabel.textContent = `Resend in ${resendSecondsRemaining}s`;
+      resendSecondsRemaining--;
+    } else {
+      clearInterval(resendTimerInterval);
+      resendTimerInterval = null;
+      resendBtn.disabled = false;
+      resendLabel.textContent = 'Resend Code';
+      if (resendIcon) resendIcon.classList.remove('animate-spin');
+    }
+  };
+
+  updateUI();
+  resendTimerInterval = setInterval(updateUI, 1000);
+}
+
 /**
- * Resends a fresh OTP code to the registered email
+ * Resends a fresh OTP code to the registered email with cooldown and anti-spam protection
  */
-async function resendRegistrationOtp() {
+async function triggerResendOtp() {
+  if (resendSecondsRemaining > 0) return;
+
+  const resendBtn = document.getElementById('portal-otp-resend-btn');
+  const resendLabel = document.getElementById('portal-otp-resend-label');
+  const resendIcon = document.getElementById('portal-otp-resend-icon');
+
   let target = pendingRegistration;
   if (!target) {
     try {
@@ -707,9 +744,14 @@ async function resendRegistrationOtp() {
   }
 
   if (!target || (!target.userId && !target.email)) {
-    showToast('Cannot Resend', 'No active session found. Please register or sign in again.', 'warning');
+    showToast('Session Expired', 'Please enter your email and register again.', 'warning');
+    showPortalAuthTab('register');
     return;
   }
+
+  if (resendBtn) resendBtn.disabled = true;
+  if (resendIcon) resendIcon.classList.add('animate-spin');
+  if (resendLabel) resendLabel.textContent = 'Sending...';
 
   try {
     const res = await fetch('/api/auth/resend-registration-otp', {
@@ -717,16 +759,44 @@ async function resendRegistrationOtp() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userId: target.userId, email: target.email }),
     });
+
     const data = await res.json();
+
     if (!res.ok) {
-      showToast('Resend Notice', data.error || 'Failed to dispatch verification code.', 'error');
-    } else {
-      showToast('Code Resent', data.message || `Dispatched fresh code to ${target.email}`, 'success');
+      if (res.status === 429) {
+        startResendCooldown(data.waitSec || 15);
+        showToast('Please Wait', data.error, 'warning');
+      } else {
+        showToast('Resend Failed', data.error || 'Failed to dispatch code.', 'error');
+        if (resendBtn) resendBtn.disabled = false;
+        if (resendLabel) resendLabel.textContent = 'Resend Code';
+        if (resendIcon) resendIcon.classList.remove('animate-spin');
+      }
+      return;
     }
+
+    showToast('Code Dispatched!', data.message || `Fresh verification code sent to ${target.email}`, 'success');
+    const statusText = document.getElementById('portal-otp-status-text');
+    if (statusText) statusText.textContent = `Fresh code dispatched to ${target.email}. Please check your Inbox and Spam folders.`;
+
+    // Clear input so user types fresh code
+    const codeInput = document.getElementById('portal-otp-code-input');
+    if (codeInput) {
+      codeInput.value = '';
+      codeInput.focus();
+    }
+
+    startResendCooldown(data.cooldownSeconds || 30);
   } catch (err) {
     showToast('Error', err.message, 'error');
+    if (resendBtn) resendBtn.disabled = false;
+    if (resendLabel) resendLabel.textContent = 'Resend Code';
+    if (resendIcon) resendIcon.classList.remove('animate-spin');
   }
 }
+
+// Backward-compatible alias
+const resendRegistrationOtp = triggerResendOtp;
 
 /**
  * Handle Portal Admin Code Submit

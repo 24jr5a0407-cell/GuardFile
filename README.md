@@ -32,7 +32,7 @@ TrustVault is engineered to run seamlessly on **any machine** (Windows, macOS, L
 
 ```bash
 # 1. Clone repository
-git clone https://github.com/Arshad-o/Guardfile.git
+git clone https://github.com/24jr5a0407-cell/GuardFile.git
 cd Guardfile
 
 # 2. Install dependencies

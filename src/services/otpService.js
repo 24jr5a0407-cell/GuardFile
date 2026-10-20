@@ -1,4 +1,4 @@
-const { transporter } = require('../config/email');
+const { transporter, smtpUser } = require('../config/email');
 const { query } = require('../config/database');
 const { generateOtp } = require('../utils/crypto');
 
@@ -37,7 +37,7 @@ async function sendOtp(userId, email, purpose = 'Login Verification') {
   let delivered = false;
   try {
     const info = await transporter.sendMail({
-      from: `"TrustVault Security" <${process.env.SMTP_USER || 'guradfile@gmail.com'}>`,
+      from: `"TrustVault Security" <${smtpUser}>`,
       to: email,
       subject: `[TrustVault] Your Security Verification Code: ${otp}`,
       html: emailHtml,
@@ -126,7 +126,7 @@ async function notifyAdminPendingApproval(user) {
 
   try {
     await transporter.sendMail({
-      from: `"TrustVault Security" <${process.env.SMTP_USER || 'guradfile@gmail.com'}>`,
+      from: `"TrustVault Security" <${smtpUser}>`,
       to: adminEmail,
       subject: `[TrustVault Alert] Action Required: New User ${user.name} Awaiting Approval`,
       html: emailHtml,
@@ -166,7 +166,7 @@ async function sendAdminApprovalCode(userEmail, code, userName) {
   let delivered = false;
   try {
     const info = await transporter.sendMail({
-      from: `"TrustVault Security" <${process.env.SMTP_USER || 'guradfile@gmail.com'}>`,
+      from: `"TrustVault Security" <${smtpUser}>`,
       to: userEmail,
       subject: `[TrustVault] Your Admin Access Authorization Code: ${code}`,
       html: emailHtml,

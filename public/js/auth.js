@@ -447,17 +447,14 @@ async function handlePortalLoginSubmit(e) {
 
     if (data.require2FA) {
       pending2FA = data;
+      pendingRegistration = null;
       showPortalAuthTab('otp');
       const targetEl = document.getElementById('portal-otp-target-email');
       if (targetEl) targetEl.textContent = data.email;
       const statusEl = document.getElementById('portal-otp-status-text');
-      if (statusEl) statusEl.textContent = data.message;
-      if (data.devOtp) {
-        const devHint = document.getElementById('portal-otp-dev-hint');
-        if (devHint) devHint.textContent = `Demo Code: ${data.devOtp}`;
-        const codeInput = document.getElementById('portal-otp-code-input');
-        if (codeInput) codeInput.value = data.devOtp;
-      }
+      if (statusEl) statusEl.textContent = data.message || `Security verification code sent to ${data.email}`;
+      const codeInput = document.getElementById('portal-otp-code-input');
+      if (codeInput) codeInput.value = '';
       return false;
     }
 
@@ -570,8 +567,12 @@ async function handlePortalRegisterSubmit(e) {
       name: data.name,
       role: data.role,
     };
+    pending2FA = null;
+    try {
+      sessionStorage.setItem('trustvault_pending_reg', JSON.stringify(pendingRegistration));
+    } catch (e) {}
 
-    showToast('Account Created', 'A 6-digit verification OTP has been sent to your email.', 'success');
+    showToast('Account Created', `A 6-digit verification OTP has been sent to ${data.email}.`, 'success');
     handleAccountStatusResponse(data);
   } catch (err) {
     errorEl.textContent = err.message;
@@ -599,6 +600,12 @@ async function handlePortalOtpSubmit(e) {
 
   errorEl.classList.add('hidden');
 
+  if (!code || code.length !== 6) {
+    errorEl.textContent = 'Please enter the complete 6-digit verification code.';
+    errorEl.classList.remove('hidden');
+    return false;
+  }
+
   const origBtnText = submitBtn ? submitBtn.innerHTML : 'Verify Email Code';
   if (submitBtn) {
     submitBtn.disabled = true;
@@ -614,11 +621,40 @@ async function handlePortalOtpSubmit(e) {
   }
 
   try {
-    if (pending2FA) {
-      const res = await fetch('/api/auth/verify-2fa', {
+    // Check if we have an active pending registration
+    if (!pendingRegistration) {
+      try {
+        const stored = sessionStorage.getItem('trustvault_pending_reg');
+        if (stored) pendingRegistration = JSON.parse(stored);
+      } catch (e) {}
+    }
+
+    if (pendingRegistration && pendingRegistration.userId) {
+      const res = await fetch('/api/auth/verify-registration-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: pending2FA.userId, otp: code }),
+        body: JSON.stringify({ userId: pendingRegistration.userId, otpCode: code, otp: code }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        errorEl.textContent = data.error || 'Verification code failed. Please check the code in your email.';
+        errorEl.classList.remove('hidden');
+        return false;
+      }
+
+      showToast('Email Verified!', data.message, 'success');
+      handleAccountStatusResponse(data);
+      return false;
+    }
+
+    // Otherwise, check if this is a login 2FA verification
+    if (pending2FA && pending2FA.userId) {
+      const res = await fetch('/api/auth/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: pending2FA.userId, otpCode: code, otp: code }),
       });
 
       const data = await res.json();
@@ -640,35 +676,8 @@ async function handlePortalOtpSubmit(e) {
       return false;
     }
 
-    if (!pendingRegistration) {
-      try {
-        const stored = sessionStorage.getItem('trustvault_pending_reg');
-        if (stored) pendingRegistration = JSON.parse(stored);
-      } catch (e) {}
-    }
-
-    if (!pendingRegistration || !pendingRegistration.userId) {
-      errorEl.textContent = 'Registration session expired. Please sign in or register again.';
-      errorEl.classList.remove('hidden');
-      return false;
-    }
-
-    const res = await fetch('/api/auth/verify-registration-otp', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: pendingRegistration.userId, otpCode: code, otp: code }),
-    });
-
-    const data = await res.json();
-
-    if (!res.ok) {
-      errorEl.textContent = data.error || 'Verification code failed.';
-      errorEl.classList.remove('hidden');
-      return false;
-    }
-
-    showToast('Email Verified!', data.message, 'success');
-    handleAccountStatusResponse(data);
+    errorEl.textContent = 'Verification session expired. Please sign in or register again.';
+    errorEl.classList.remove('hidden');
   } catch (err) {
     errorEl.textContent = err.message;
     errorEl.classList.remove('hidden');
@@ -679,6 +688,44 @@ async function handlePortalOtpSubmit(e) {
     }
   }
   return false;
+}
+
+/**
+ * Resends a fresh OTP code to the registered email
+ */
+async function resendRegistrationOtp() {
+  let target = pendingRegistration;
+  if (!target) {
+    try {
+      const stored = sessionStorage.getItem('trustvault_pending_reg');
+      if (stored) target = JSON.parse(stored);
+    } catch (e) {}
+  }
+
+  if (!target && pending2FA) {
+    target = pending2FA;
+  }
+
+  if (!target || (!target.userId && !target.email)) {
+    showToast('Cannot Resend', 'No active session found. Please register or sign in again.', 'warning');
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/auth/resend-registration-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: target.userId, email: target.email }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      showToast('Resend Notice', data.error || 'Failed to dispatch verification code.', 'error');
+    } else {
+      showToast('Code Resent', data.message || `Dispatched fresh code to ${target.email}`, 'success');
+    }
+  } catch (err) {
+    showToast('Error', err.message, 'error');
+  }
 }
 
 /**

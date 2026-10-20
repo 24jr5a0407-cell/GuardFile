@@ -153,6 +153,43 @@ router.post('/verify-registration-otp', async (req, res) => {
 });
 
 /**
+ * POST /api/auth/resend-registration-otp
+ * Resends a fresh 6-digit verification OTP to the user's registered email.
+ */
+router.post('/resend-registration-otp', async (req, res) => {
+  const { userId, email } = req.body;
+  if (!userId && !email) {
+    return res.status(400).json({ error: 'userId or email is required to resend verification OTP.' });
+  }
+
+  try {
+    let user;
+    if (userId) {
+      const result = await query('SELECT id, email, name FROM users WHERE id = $1', [userId]);
+      user = result.rows && result.rows[0];
+    } else {
+      const result = await query('SELECT id, email, name FROM users WHERE LOWER(email) = LOWER($1)', [email.trim()]);
+      user = result.rows && result.rows[0];
+    }
+
+    if (!user) {
+      return res.status(404).json({ error: 'User record not found.' });
+    }
+
+    const otpResult = await sendOtp(user.id, user.email, 'Account Registration Verification (Resend)');
+
+    res.json({
+      success: true,
+      message: `A fresh 6-digit verification code has been dispatched to ${user.email}.`,
+      delivered: otpResult.delivered,
+    });
+  } catch (err) {
+    console.error('[Resend OTP Error]', err);
+    res.status(500).json({ error: 'Failed to resend verification OTP.' });
+  }
+});
+
+/**
  * GET /api/auth/pending-approvals
  * Administrator-only endpoint to view users awaiting authorization codes.
  */
@@ -642,6 +679,12 @@ router.post('/verify-otp', async (req, res) => {
     console.error('[Verify OTP Error]', err);
     res.status(500).json({ error: 'Failed to verify OTP.' });
   }
+});
+
+// Alias for backwards-compatibility or cached frontends
+router.post('/verify-2fa', (req, res, next) => {
+  req.url = '/verify-otp';
+  router.handle(req, res, next);
 });
 
 /**

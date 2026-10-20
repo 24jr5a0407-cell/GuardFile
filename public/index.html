@@ -399,9 +399,12 @@
           </button>
         </form>
 
-        <div class="text-center">
-          <button type="button" onclick="showPortalAuthTab('login')" class="text-xs text-slate-500 hover:text-slate-800 cursor-pointer">
+        <div class="flex items-center justify-between text-xs text-slate-500 pt-1">
+          <button type="button" onclick="showPortalAuthTab('login')" class="hover:text-slate-800 cursor-pointer">
             ← Back to Sign In
+          </button>
+          <button type="button" onclick="resendRegistrationOtp()" class="text-blue-600 hover:text-blue-800 font-semibold cursor-pointer">
+            Resend Code
           </button>
         </div>
       </div>

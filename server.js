@@ -106,7 +106,15 @@ app.get(['/api/health', '/healthz'], (req, res) => {
 // IMPORTANT ZERO-TRUST ARCHITECTURE NOTE:
 // ONLY public/ is statically served. The /secure_storage directory is strictly OUTSIDE
 // the web root and can NEVER be accessed directly by HTTP path traversal!
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public'), {
+  etag: false,
+  maxAge: 0,
+  setHeaders: (res, filePath) => {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+  }
+}));
 
 // SPA fallback for non-API routes
 app.use((req, res, next) => {

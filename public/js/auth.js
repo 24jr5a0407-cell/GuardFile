@@ -1,5 +1,10 @@
 // TrustVault Authentication & Multi-Step Zero-Trust Onboarding Module
 
+// Defensively guarantee window.lucide stub to prevent ReferenceError
+if (typeof window.lucide === 'undefined') {
+  window.lucide = { createIcons: function() {} };
+}
+
 let currentUser = null;
 let pendingRegistration = null; // { userId, email, phone, name, role }
 let pending2FA = null;
@@ -29,7 +34,9 @@ function showToast(title, message, type = 'info') {
   }
 
   try {
-    if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
+    if (typeof lucide !== 'undefined' && lucide && typeof lucide.createIcons === 'function') {
+      lucide.createIcons();
+    }
   } catch (e) {}
 
   toast.classList.remove('hidden');
@@ -51,18 +58,42 @@ function setToken(token) {
 }
 
 function showAuthPortal() {
-  document.getElementById('auth-portal-view')?.classList.remove('hidden');
-  document.getElementById('main-dashboard-container')?.classList.add('hidden');
+  const portal = document.getElementById('auth-portal-view');
+  const dash = document.getElementById('main-dashboard-container');
+
+  if (portal) {
+    portal.classList.remove('hidden');
+    portal.style.setProperty('display', 'flex', 'important');
+  }
+  if (dash) {
+    dash.classList.add('hidden');
+    dash.style.setProperty('display', 'none', 'important');
+  }
+
   showPortalAuthTab('login');
-  if (window.lucide) lucide.createIcons();
+  try {
+    if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
+  } catch (e) {}
 }
 
 function showDashboard() {
-  document.getElementById('auth-portal-view')?.classList.add('hidden');
-  document.getElementById('main-dashboard-container')?.classList.remove('hidden');
+  const portal = document.getElementById('auth-portal-view');
+  const dash = document.getElementById('main-dashboard-container');
+
+  if (portal) {
+    portal.classList.add('hidden');
+    portal.style.setProperty('display', 'none', 'important');
+  }
+  if (dash) {
+    dash.classList.remove('hidden');
+    dash.style.setProperty('display', 'flex', 'important');
+  }
+
   closeGoogleModal();
   closeTermsModal();
-  if (window.lucide) lucide.createIcons();
+  try {
+    if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
+  } catch (e) {}
 }
 
 function clearSession() {
@@ -340,20 +371,29 @@ function handleAccountStatusResponse(data) {
  * Handle Portal Login
  */
 async function handlePortalLoginSubmit(e) {
-  e.preventDefault();
+  if (e) {
+    if (typeof e.preventDefault === 'function') e.preventDefault();
+    if (typeof e.stopPropagation === 'function') e.stopPropagation();
+  }
   const emailInput = document.getElementById('portal-login-email');
   const passwordInput = document.getElementById('portal-login-password');
   const require2fa = document.getElementById('portal-login-require-2fa')?.checked || false;
   const errorEl = document.getElementById('portal-login-error');
-  const submitBtn = e.target.querySelector('button[type="submit"]');
+  const submitBtn = document.getElementById('portal-login-submit-btn') || (e && e.target && e.target.querySelector ? e.target.querySelector('button[type="submit"]') : null);
 
-  if (!emailInput || !passwordInput || !errorEl) return;
+  if (!emailInput || !passwordInput || !errorEl) return false;
 
   const email = emailInput.value.trim();
   const password = passwordInput.value;
 
+  if (!email || !password) {
+    errorEl.textContent = 'Please enter both your work email and password.';
+    errorEl.classList.remove('hidden');
+    return false;
+  }
+
   errorEl.classList.add('hidden');
-  const origBtnText = submitBtn ? submitBtn.innerHTML : 'Sign In';
+  const origBtnText = submitBtn ? submitBtn.innerHTML : 'Sign In to Vault';
   if (submitBtn) {
     submitBtn.disabled = true;
     submitBtn.innerHTML = `
@@ -390,12 +430,12 @@ async function handlePortalLoginSubmit(e) {
         </div>
       `;
       errorEl.classList.remove('hidden');
-      return;
+      return false;
     }
 
     if (data.account_status && data.account_status !== 'ACTIVE') {
       handleAccountStatusResponse(data);
-      return;
+      return false;
     }
 
     if (data.require2FA) {
@@ -411,7 +451,7 @@ async function handlePortalLoginSubmit(e) {
         const codeInput = document.getElementById('portal-otp-code-input');
         if (codeInput) codeInput.value = data.devOtp;
       }
-      return;
+      return false;
     }
 
     setToken(data.token);
@@ -430,38 +470,64 @@ async function handlePortalLoginSubmit(e) {
       submitBtn.innerHTML = origBtnText;
     }
   }
+  return false;
 }
 
 /**
  * Handle Portal Registration
  */
 async function handlePortalRegisterSubmit(e) {
-  e.preventDefault();
-  const name = document.getElementById('portal-reg-name').value.trim();
-  const email = document.getElementById('portal-reg-email').value.trim();
-  const phone = document.getElementById('portal-reg-phone').value.trim();
-  const password = document.getElementById('portal-reg-password').value;
-  const confirmPassword = document.getElementById('portal-reg-confirm-password').value;
-  const role = document.querySelector('input[name="portal-reg-role"]:checked')?.value || 'viewer';
-  const termsAccepted = document.getElementById('portal-reg-terms').checked;
+  if (e) {
+    if (typeof e.preventDefault === 'function') e.preventDefault();
+    if (typeof e.stopPropagation === 'function') e.stopPropagation();
+  }
+  const nameInput = document.getElementById('portal-reg-name');
+  const emailInput = document.getElementById('portal-reg-email');
+  const phoneInput = document.getElementById('portal-reg-phone');
+  const passwordInput = document.getElementById('portal-reg-password');
+  const confirmPasswordInput = document.getElementById('portal-reg-confirm-password');
+  const termsInput = document.getElementById('portal-reg-terms');
   const errorEl = document.getElementById('portal-reg-error');
-  const submitBtn = e.target.querySelector('button[type="submit"]');
+  const submitBtn = document.getElementById('portal-reg-submit-btn') || (e && e.target && e.target.querySelector ? e.target.querySelector('button[type="submit"]') : null);
+
+  if (!nameInput || !emailInput || !phoneInput || !passwordInput || !confirmPasswordInput || !termsInput || !errorEl) return false;
+
+  const name = nameInput.value.trim();
+  const email = emailInput.value.trim();
+  const phone = phoneInput.value.trim();
+  const password = passwordInput.value;
+  const confirmPassword = confirmPasswordInput.value;
+  const roleInput = document.querySelector('input[name="portal-reg-role"]');
+  const role = roleInput ? roleInput.value : 'viewer';
+  const termsAccepted = termsInput.checked;
 
   errorEl.classList.add('hidden');
+
+  if (!name || !email || !phone || !password) {
+    errorEl.textContent = 'All fields marked with an asterisk (*) are required.';
+    errorEl.classList.remove('hidden');
+    return false;
+  }
+
+  if (password.length < 6) {
+    errorEl.textContent = 'Password must be at least 6 characters long.';
+    errorEl.classList.remove('hidden');
+    return false;
+  }
 
   if (password !== confirmPassword) {
     errorEl.textContent = 'Passwords do not match. Please verify.';
     errorEl.classList.remove('hidden');
-    return;
+    return false;
   }
 
   if (!termsAccepted) {
     errorEl.textContent = 'You must agree to the Terms of Service & Privacy Policy.';
     errorEl.classList.remove('hidden');
-    return;
+    return false;
   }
 
-  const origBtnText = submitBtn ? submitBtn.innerHTML : 'Create Account';
+  const origBtnText = submitBtn ? submitBtn.innerHTML : 'Create Account & Verify OTP';
   if (submitBtn) {
     submitBtn.disabled = true;
     submitBtn.innerHTML = `
@@ -479,7 +545,7 @@ async function handlePortalRegisterSubmit(e) {
     const res = await fetch('/api/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, email, phone, password, role, termsAccepted }),
+      body: JSON.stringify({ name, email, phone, password, role, termsAccepted: true }),
     });
 
     const data = await res.json();
@@ -487,7 +553,7 @@ async function handlePortalRegisterSubmit(e) {
     if (!res.ok) {
       errorEl.textContent = data.error || 'Registration failed.';
       errorEl.classList.remove('hidden');
-      return;
+      return false;
     }
 
     pendingRegistration = {
@@ -509,20 +575,24 @@ async function handlePortalRegisterSubmit(e) {
       submitBtn.innerHTML = origBtnText;
     }
   }
+  return false;
 }
 
 /**
  * Handle Portal OTP Verification
  */
 async function handlePortalOtpSubmit(e) {
-  e.preventDefault();
+  if (e) {
+    if (typeof e.preventDefault === 'function') e.preventDefault();
+    if (typeof e.stopPropagation === 'function') e.stopPropagation();
+  }
   const code = document.getElementById('portal-otp-code-input').value.trim();
   const errorEl = document.getElementById('portal-otp-error');
-  const submitBtn = e.target.querySelector('button[type="submit"]');
+  const submitBtn = document.getElementById('portal-otp-submit-btn') || (e && e.target && e.target.querySelector ? e.target.querySelector('button[type="submit"]') : null);
 
   errorEl.classList.add('hidden');
 
-  const origBtnText = submitBtn ? submitBtn.innerHTML : 'Verify Code';
+  const origBtnText = submitBtn ? submitBtn.innerHTML : 'Verify Email Code';
   if (submitBtn) {
     submitBtn.disabled = true;
     submitBtn.innerHTML = `
@@ -549,7 +619,7 @@ async function handlePortalOtpSubmit(e) {
       if (!res.ok) {
         errorEl.textContent = data.error || 'Invalid OTP code.';
         errorEl.classList.remove('hidden');
-        return;
+        return false;
       }
 
       setToken(data.token);
@@ -560,13 +630,13 @@ async function handlePortalOtpSubmit(e) {
       showToast('2FA Verified', `Welcome back, ${currentUser.name}!`, 'success');
       if (typeof loadDocuments === 'function') loadDocuments();
       if (typeof updateStats === 'function') updateStats();
-      return;
+      return false;
     }
 
     if (!pendingRegistration) {
       errorEl.textContent = 'Session expired. Please restart registration.';
       errorEl.classList.remove('hidden');
-      return;
+      return false;
     }
 
     const res = await fetch('/api/auth/verify-registration-otp', {
@@ -580,7 +650,7 @@ async function handlePortalOtpSubmit(e) {
     if (!res.ok) {
       errorEl.textContent = data.error || 'Verification code failed.';
       errorEl.classList.remove('hidden');
-      return;
+      return false;
     }
 
     showToast('Email Verified!', data.message, 'success');
@@ -594,26 +664,30 @@ async function handlePortalOtpSubmit(e) {
       submitBtn.innerHTML = origBtnText;
     }
   }
+  return false;
 }
 
 /**
  * Handle Portal Admin Code Submit
  */
 async function handlePortalAdminCodeSubmit(e) {
-  e.preventDefault();
+  if (e) {
+    if (typeof e.preventDefault === 'function') e.preventDefault();
+    if (typeof e.stopPropagation === 'function') e.stopPropagation();
+  }
   const code = document.getElementById('portal-admin-code-input').value.trim();
   const errorEl = document.getElementById('portal-admin-code-error');
-  const submitBtn = e.target.querySelector('button[type="submit"]');
+  const submitBtn = document.getElementById('portal-admin-code-submit-btn') || (e && e.target && e.target.querySelector ? e.target.querySelector('button[type="submit"]') : null);
 
   errorEl.classList.add('hidden');
 
   if (!pendingRegistration) {
     errorEl.textContent = 'Session state missing. Please sign in again.';
     errorEl.classList.remove('hidden');
-    return;
+    return false;
   }
 
-  const origBtnText = submitBtn ? submitBtn.innerHTML : 'Unlock Vault';
+  const origBtnText = submitBtn ? submitBtn.innerHTML : 'Unlock Vault & Open Dashboard';
   if (submitBtn) {
     submitBtn.disabled = true;
     submitBtn.innerHTML = `
@@ -622,7 +696,7 @@ async function handlePortalAdminCodeSubmit(e) {
           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
         </svg>
-        Unlocking Vault...
+        Validating Authorization...
       </span>
     `;
   }
@@ -639,7 +713,7 @@ async function handlePortalAdminCodeSubmit(e) {
     if (!res.ok) {
       errorEl.textContent = data.error || 'Invalid administrator authorization code.';
       errorEl.classList.remove('hidden');
-      return;
+      return false;
     }
 
     setToken(data.token);
@@ -659,6 +733,7 @@ async function handlePortalAdminCodeSubmit(e) {
       submitBtn.innerHTML = origBtnText;
     }
   }
+  return false;
 }
 
 /**

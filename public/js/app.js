@@ -49,6 +49,10 @@ async function updateStats() {
  * Displays an interactive toast notification.
  */
 function showToast(title, message, type = 'info') {
+  if (typeof window.showToast === 'function' && window.showToast !== showToast) {
+    return window.showToast(title, message, type);
+  }
+
   const toast = document.getElementById('toast');
   const toastTitle = document.getElementById('toast-title');
   const toastMsg = document.getElementById('toast-message');
@@ -56,22 +60,31 @@ function showToast(title, message, type = 'info') {
 
   if (!toast) return;
 
-  toastTitle.textContent = title;
-  toastMsg.textContent = message;
+  if (toastTitle) toastTitle.textContent = title;
+  if (toastMsg) toastMsg.textContent = message;
 
-  if (type === 'success') {
-    toastIcon.innerHTML = '<i data-lucide="check-circle" class="w-5 h-5 text-emerald-400"></i>';
-  } else if (type === 'error') {
-    toastIcon.innerHTML = '<i data-lucide="alert-triangle" class="w-5 h-5 text-rose-400"></i>';
-  } else {
-    toastIcon.innerHTML = '<i data-lucide="info" class="w-5 h-5 text-blue-400"></i>';
+  if (toastIcon) {
+    if (type === 'success') {
+      toastIcon.innerHTML = '<i data-lucide="check-circle" class="w-5 h-5 text-emerald-400"></i>';
+    } else if (type === 'error') {
+      toastIcon.innerHTML = '<i data-lucide="alert-triangle" class="w-5 h-5 text-rose-400"></i>';
+    } else {
+      toastIcon.innerHTML = '<i data-lucide="info" class="w-5 h-5 text-blue-400"></i>';
+    }
   }
 
-  lucide.createIcons();
+  try {
+    if (typeof lucide !== 'undefined' && lucide && typeof lucide.createIcons === 'function') {
+      lucide.createIcons();
+    }
+  } catch (e) {}
+
   toast.classList.remove('hidden');
+  toast.style.display = 'flex';
 
   setTimeout(() => {
     toast.classList.add('hidden');
+    toast.style.display = 'none';
   }, 4500);
 }
 

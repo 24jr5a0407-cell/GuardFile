@@ -1,20 +1,55 @@
-/* Custom TrustVault Styling & Micro-interactions */
+/* ==========================================================================
+   TrustVault — Enterprise Human-Crafted Design System & Micro-Interactions
+   Inspired by Linear, Stripe & Supabase Design Standards
+   ========================================================================== */
+
+/* 1. CRITICAL VISIBILITY & OVERLAY FIXES (Prevents blocking tabs/clicks) */
+.hidden,
+[hidden] {
+  display: none !important;
+  pointer-events: none !important;
+}
+
+.modal-backdrop.hidden {
+  display: none !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+}
+
+.modal-backdrop:not(.hidden) {
+  display: flex !important;
+  pointer-events: auto !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+#toast:not(.hidden) {
+  display: flex !important;
+  pointer-events: auto !important;
+}
+
+/* 2. SMOOTH ANIMATIONS & MICRO-INTERACTIONS */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
 
 @keyframes scaleUp {
   from {
     opacity: 0;
-    transform: scale(0.96);
+    transform: scale(0.97) translateY(4px);
   }
   to {
     opacity: 1;
-    transform: scale(1);
+    transform: scale(1) translateY(0);
   }
 }
 
 @keyframes slideUp {
   from {
     opacity: 0;
-    transform: translateY(16px);
+    transform: translateY(12px);
   }
   to {
     opacity: 1;
@@ -22,15 +57,39 @@
   }
 }
 
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(37, 99, 235, 0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.2s ease-out forwards;
+}
+
 .animate-scale-up {
-  animation: scaleUp 0.15s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: scaleUp 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .animate-slide-up {
-  animation: slideUp 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: slideUp 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-/* Custom Scrollbar */
+.pulse-glow {
+  animation: pulseGlow 2.5s infinite;
+}
+
+/* 3. REFINED TYPOGRAPHY & SMOOTH SCROLLING */
+html {
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 4. CUSTOM SLICK SCROLLBAR */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -49,9 +108,100 @@
   background: #94a3b8;
 }
 
-/* Active tab styling */
+/* 5. SEGMENTED TAB CONTROLS (macOS / iOS style) */
+.segmented-control {
+  background-color: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.875rem;
+  padding: 0.25rem;
+  display: flex;
+  gap: 0.25rem;
+}
+
+.segmented-tab-btn {
+  flex: 1;
+  padding: 0.5rem 0.875rem;
+  border-radius: 0.625rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #64748b;
+  text-align: center;
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  border: 1px solid transparent;
+  cursor: pointer;
+  user-select: none;
+}
+
+.segmented-tab-btn:hover {
+  color: #0f172a;
+}
+
+.segmented-tab-btn.active {
+  background-color: #ffffff;
+  color: #0f172a;
+  border-color: rgba(226, 232, 240, 0.8);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+/* Active tab navigation styling in dashboard */
 .tab-btn.active {
-  background-color: #eff6ff;
+  background-color: #ffffff;
   color: #1d4ed8;
-  border-color: #bfdbfe;
+  border-color: #dbeafe;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+/* 6. BUTTON MICRO-INTERACTIONS */
+button:active {
+  transform: scale(0.985);
+}
+
+button:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+/* 7. GLASS & SURFACE STYLING */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+}
+
+.glass-dark {
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+/* 8. FORM INPUT REFINEMENTS */
+.human-input {
+  transition: all 0.15s ease-in-out;
+  border: 1px solid #e2e8f0;
+  background-color: #f8fafc;
+}
+
+.human-input:hover {
+  border-color: #cbd5e1;
+}
+
+.human-input:focus {
+  background-color: #ffffff;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+  outline: none;
+}
+
+/* 9. SHADOW ELEVATIONS */
+.shadow-subtle {
+  box-shadow: 0 1px 2px 0 rgba(15, 23, 42, 0.04), 0 1px 3px 0 rgba(15, 23, 42, 0.02);
+}
+
+.shadow-card {
+  box-shadow: 0 4px 6px -1px rgba(15, 23, 42, 0.05), 0 2px 4px -2px rgba(15, 23, 42, 0.03);
+}
+
+.shadow-elevation {
+  box-shadow: 0 20px 25px -5px rgba(15, 23, 42, 0.08), 0 8px 10px -6px rgba(15, 23, 42, 0.04);
 }

@@ -218,16 +218,16 @@ function showPortalAuthTab(tab) {
   if (tab === 'login') {
     tabHeader?.classList.remove('hidden');
     loginView?.classList.remove('hidden');
-    tabBtnLogin?.classList.add('border-blue-600', 'text-blue-600', 'font-bold');
+    tabBtnLogin?.classList.add('active', 'border-blue-600', 'text-blue-600', 'font-bold');
     tabBtnLogin?.classList.remove('text-slate-500', 'border-transparent');
-    tabBtnRegister?.classList.remove('border-blue-600', 'text-blue-600', 'font-bold');
+    tabBtnRegister?.classList.remove('active', 'border-blue-600', 'text-blue-600', 'font-bold');
     tabBtnRegister?.classList.add('text-slate-500', 'border-transparent');
   } else if (tab === 'register') {
     tabHeader?.classList.remove('hidden');
     registerView?.classList.remove('hidden');
-    tabBtnRegister?.classList.add('border-blue-600', 'text-blue-600', 'font-bold');
+    tabBtnRegister?.classList.add('active', 'border-blue-600', 'text-blue-600', 'font-bold');
     tabBtnRegister?.classList.remove('text-slate-500', 'border-transparent');
-    tabBtnLogin?.classList.remove('border-blue-600', 'text-blue-600', 'font-bold');
+    tabBtnLogin?.classList.remove('active', 'border-blue-600', 'text-blue-600', 'font-bold');
     tabBtnLogin?.classList.add('text-slate-500', 'border-transparent');
   } else if (tab === 'otp') {
     tabHeader?.classList.add('hidden');
@@ -269,16 +269,16 @@ function showAuthTab(tab) {
   if (tab === 'login') {
     tabHeader?.classList.remove('hidden');
     loginView?.classList.remove('hidden');
-    tabBtnLogin?.classList.add('border-blue-600', 'text-blue-600', 'font-bold');
+    tabBtnLogin?.classList.add('active', 'border-blue-600', 'text-blue-600', 'font-bold');
     tabBtnLogin?.classList.remove('text-slate-500', 'border-transparent');
-    tabBtnRegister?.classList.remove('border-blue-600', 'text-blue-600', 'font-bold');
+    tabBtnRegister?.classList.remove('active', 'border-blue-600', 'text-blue-600', 'font-bold');
     tabBtnRegister?.classList.add('text-slate-500', 'border-transparent');
   } else if (tab === 'register') {
     tabHeader?.classList.remove('hidden');
     registerView?.classList.remove('hidden');
-    tabBtnRegister?.classList.add('border-blue-600', 'text-blue-600', 'font-bold');
+    tabBtnRegister?.classList.add('active', 'border-blue-600', 'text-blue-600', 'font-bold');
     tabBtnRegister?.classList.remove('text-slate-500', 'border-transparent');
-    tabBtnLogin?.classList.remove('border-blue-600', 'text-blue-600', 'font-bold');
+    tabBtnLogin?.classList.remove('active', 'border-blue-600', 'text-blue-600', 'font-bold');
     tabBtnLogin?.classList.add('text-slate-500', 'border-transparent');
   } else if (tab === 'otp') {
     tabHeader?.classList.add('hidden');

@@ -181,18 +181,20 @@
       </div>
 
       <!-- Segmented Tab Header (Sign In vs Create Account) -->
-      <div id="auth-portal-tab-header" class="flex border-b border-slate-200">
+      <div id="auth-portal-tab-header" class="segmented-control mb-1">
         <button
+          type="button"
           id="portal-tab-btn-login"
           onclick="showPortalAuthTab('login')"
-          class="flex-1 py-2.5 text-xs font-bold text-center border-b-2 border-blue-600 text-blue-600 transition"
+          class="segmented-tab-btn active"
         >
           Sign In
         </button>
         <button
+          type="button"
           id="portal-tab-btn-register"
           onclick="showPortalAuthTab('register')"
-          class="flex-1 py-2.5 text-xs font-semibold text-center border-b-2 border-transparent text-slate-500 hover:text-slate-800 transition"
+          class="segmented-tab-btn"
         >
           Create Account
         </button>
@@ -794,7 +796,7 @@
   </div>
 
   <!-- MODAL: Upload Document -->
-  <div id="modal-upload" class="modal-backdrop hidden fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+  <div id="modal-upload" class="modal-backdrop hidden fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 items-center justify-center p-4">
     <div class="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-lg w-full p-6 animate-scale-up">
       <div class="flex items-center justify-between pb-4 border-b border-slate-100 mb-4">
         <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
@@ -840,7 +842,7 @@
   </div>
 
   <!-- MODAL: Manage Document Permissions -->
-  <div id="modal-permissions" class="modal-backdrop hidden fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+  <div id="modal-permissions" class="modal-backdrop hidden fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 items-center justify-center p-4">
     <div class="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-xl w-full p-6 animate-scale-up flex flex-col gap-4">
       <div class="flex items-center justify-between pb-3 border-b border-slate-100">
         <div>
@@ -886,7 +888,7 @@
   </div>
 
   <!-- MODAL: In-Browser Document Preview -->
-  <div id="modal-preview" class="modal-backdrop hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+  <div id="modal-preview" class="modal-backdrop hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 items-center justify-center p-4">
     <div class="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-4xl w-full h-[80vh] flex flex-col overflow-hidden animate-scale-up">
       <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50">
         <div class="flex items-center gap-2">
@@ -904,7 +906,7 @@
   </div>
 
   <!-- MODAL: Professional Zero-Trust Authentication Center -->
-  <div id="modal-auth" class="modal-backdrop hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+  <div id="modal-auth" class="modal-backdrop hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 items-center justify-center p-4">
     <div class="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-6 animate-scale-up max-h-[92vh] overflow-y-auto">
       
       <!-- Modal Header -->
@@ -924,18 +926,20 @@
       </div>
 
       <!-- Segmented Tab Header (Sign In vs Create Account) -->
-      <div id="auth-modal-tab-header" class="flex border-b border-slate-200 mt-4 mb-5">
+      <div id="auth-modal-tab-header" class="segmented-control mt-4 mb-4">
         <button
+          type="button"
           id="auth-tab-btn-login"
           onclick="showAuthTab('login')"
-          class="flex-1 py-2 text-xs font-bold text-center border-b-2 border-blue-600 text-blue-600 transition"
+          class="segmented-tab-btn active"
         >
           Sign In
         </button>
         <button
+          type="button"
           id="auth-tab-btn-register"
           onclick="showAuthTab('register')"
-          class="flex-1 py-2 text-xs font-semibold text-center border-b-2 border-transparent text-slate-500 hover:text-slate-800 transition"
+          class="segmented-tab-btn"
         >
           Create Account
         </button>
@@ -1264,7 +1268,7 @@
   </div>
 
   <!-- MODAL: Terms of Service & Privacy Policy -->
-  <div id="modal-terms" class="modal-backdrop hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+  <div id="modal-terms" class="modal-backdrop hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 items-center justify-center p-4">
     <div class="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-xl w-full p-6 animate-scale-up max-h-[85vh] flex flex-col">
       <div class="flex items-center justify-between pb-3 border-b border-slate-100">
         <div class="flex items-center gap-2">
@@ -1315,7 +1319,7 @@
   </div>
 
   <!-- Notification Toast Container -->
-  <div id="toast" class="fixed bottom-6 right-6 z-50 hidden max-w-sm w-full bg-slate-900 text-white p-4 rounded-2xl shadow-xl flex items-center gap-3 animate-slide-up border border-slate-800">
+  <div id="toast" class="fixed bottom-6 right-6 z-50 hidden max-w-sm w-full bg-slate-900 text-white p-4 rounded-2xl shadow-xl items-center gap-3 animate-slide-up border border-slate-800">
     <div id="toast-icon" class="text-emerald-400"></div>
     <div class="flex-1 text-xs">
       <p class="font-bold" id="toast-title">Notice</p>

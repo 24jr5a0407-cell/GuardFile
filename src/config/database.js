@@ -15,8 +15,10 @@ async function getDb() {
     return dbClient;
   }
 
-  // 1. Check if external PostgreSQL connection is configured
-  const connectionString = process.env.DATABASE_URL;
+  // 1. Check if external PostgreSQL connection is configured (with Supabase pooler fallback)
+  const connectionString =
+    process.env.DATABASE_URL ||
+    'postgresql://postgres.mdztlrigbzwysarttyme:Arshad%4073824@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres';
   const useExternalPostgres = Boolean(connectionString);
 
   if (useExternalPostgres) {

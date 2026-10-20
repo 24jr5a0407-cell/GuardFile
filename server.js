@@ -51,7 +51,10 @@ async function ensureDbReady() {
         console.log('[Init] No users found. Auto-seeding initial environment...');
         await seed();
       }
-    })();
+    })().catch((err) => {
+      dbReadyPromise = null; // Reset so subsequent requests can retry cleanly
+      throw err;
+    });
   }
   return dbReadyPromise;
 }

@@ -27,9 +27,9 @@ async function getDb() {
       const pool = new Pool({
         connectionString,
         ssl: process.env.PGSSL === 'false' ? false : { rejectUnauthorized: false },
-        max: 10,
+        max: process.env.VERCEL ? 3 : 10,
         idleTimeoutMillis: 30000,
-        connectionTimeoutMillis: 5000,
+        connectionTimeoutMillis: 15000,
       });
 
       const res = await pool.query('SELECT 1 as connected');
@@ -44,7 +44,10 @@ async function getDb() {
         return dbClient;
       }
     } catch (err) {
-      console.warn(`[Database] External PostgreSQL connection warning (${err.message}). Using lightweight embedded engine.`);
+      console.error(`[Database] External PostgreSQL connection warning (${err.message}).`);
+      if (process.env.VERCEL) {
+        throw new Error(`Database connection failed: ${err.message}`);
+      }
     }
   }
 

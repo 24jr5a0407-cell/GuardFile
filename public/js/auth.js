@@ -551,7 +551,7 @@ async function handlePortalRegisterSubmit(e) {
     const data = await res.json();
 
     if (!res.ok) {
-      errorEl.textContent = data.error || 'Registration failed.';
+      errorEl.textContent = data.details || data.error || 'Registration failed.';
       errorEl.classList.remove('hidden');
       return false;
     }

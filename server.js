@@ -40,16 +40,28 @@ app.use(express.json({ limit: '15mb' }));
 app.use(express.urlencoded({ extended: true, limit: '15mb' }));
 
 // Ensure database is ready before processing requests (critical for serverless cold starts)
+let isDbReady = false;
 let dbReadyPromise = null;
+
 async function ensureDbReady() {
+  if (isDbReady) return;
+
   if (!dbReadyPromise) {
     dbReadyPromise = (async () => {
-      await migrate();
-      const usersRes = await query('SELECT count(*) as count FROM users');
-      const userCount = parseInt(usersRes.rows[0]?.count || 0, 10);
-      if (userCount === 0) {
-        console.log('[Init] No users found. Auto-seeding initial environment...');
-        await seed();
+      try {
+        // Fast path: Check if database tables are already initialized
+        await query('SELECT id FROM users LIMIT 1');
+        isDbReady = true;
+      } catch (checkErr) {
+        console.log('[Init] Tables not detected. Migrating schema and seeding...', checkErr.message);
+        await migrate();
+        const usersRes = await query('SELECT count(*) as count FROM users');
+        const userCount = parseInt(usersRes.rows[0]?.count || 0, 10);
+        if (userCount === 0) {
+          console.log('[Init] No users found. Auto-seeding initial environment...');
+          await seed();
+        }
+        isDbReady = true;
       }
     })().catch((err) => {
       dbReadyPromise = null; // Reset so subsequent requests can retry cleanly
@@ -68,7 +80,7 @@ app.use(async (req, res, next) => {
     next();
   } catch (err) {
     console.error('[DB Initialization Error]', err);
-    return res.status(500).json({ error: 'Database initialization failed', details: err.message });
+    return res.status(500).json({ error: 'Database initialization failed: ' + (err.message || 'unknown error'), details: err.message });
   }
 });
 

@@ -152,6 +152,11 @@ html {
 }
 
 /* 6. BUTTON MICRO-INTERACTIONS */
+button {
+  cursor: pointer;
+  user-select: none;
+}
+
 button:active {
   transform: scale(0.985);
 }

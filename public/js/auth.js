@@ -15,7 +15,6 @@ function setToken(token) {
 function showAuthPortal() {
   document.getElementById('auth-portal-view')?.classList.remove('hidden');
   document.getElementById('main-dashboard-container')?.classList.add('hidden');
-  document.getElementById('top-bar-judge-switcher')?.classList.add('hidden');
   showPortalAuthTab('login');
   if (window.lucide) lucide.createIcons();
 }
@@ -23,8 +22,8 @@ function showAuthPortal() {
 function showDashboard() {
   document.getElementById('auth-portal-view')?.classList.add('hidden');
   document.getElementById('main-dashboard-container')?.classList.remove('hidden');
-  document.getElementById('top-bar-judge-switcher')?.classList.remove('hidden');
-  closeLoginModal();
+  closeGoogleModal();
+  closeTermsModal();
   if (window.lucide) lucide.createIcons();
 }
 
@@ -47,7 +46,6 @@ function clearSession() {
 async function initAuth() {
   const token = getToken();
   if (!token) {
-    // Show the first landing / login & registration portal page
     showAuthPortal();
     return;
   }
@@ -74,7 +72,7 @@ async function initAuth() {
 }
 
 /**
- * Quick Login function for the Judge Switcher in the top bar.
+ * Quick Login helper for testing.
  */
 async function quickLogin(email, password) {
   try {
@@ -100,91 +98,73 @@ async function quickLogin(email, password) {
     currentUser = data.user;
     showDashboard();
     renderAuthHeader();
-    showToast('Role Switched', `Active Session: ${currentUser.name} (${currentUser.role.toUpperCase()})`, 'success');
-
+    showToast('Authenticated', `Welcome back, ${currentUser.name}!`, 'success');
     if (typeof loadDocuments === 'function') loadDocuments();
-    if (typeof loadAuditLogs === 'function') loadAuditLogs();
     if (typeof updateStats === 'function') updateStats();
   } catch (err) {
-    console.error('Quick login error:', err);
-    showToast('Login Error', err.message, 'error');
+    showToast('Error', err.message, 'error');
   }
 }
 
 /**
- * Renders user profile pill and active role in the top navigation bar.
+ * Renders Top Header Session View
  */
 function renderAuthHeader() {
   const container = document.getElementById('auth-header-container');
   if (!container) return;
 
-  // Highlight active role button in the switcher
-  ['admin', 'alice', 'bob', 'charlie'].forEach(r => {
-    const btn = document.getElementById(`role-btn-${r}`);
-    if (btn) btn.classList.remove('bg-white', 'shadow-xs', 'text-blue-700', 'font-bold');
-  });
-
-  const adminTab = document.getElementById('tab-btn-approvals');
-
   if (!currentUser) {
-    if (adminTab) adminTab.classList.add('hidden');
     container.innerHTML = `
-      <div class="flex items-center gap-2">
-        <button onclick="showPortalAuthTab('login'); window.scrollTo({top: 0, behavior: 'smooth'});" class="px-3.5 py-1.5 text-xs font-semibold text-slate-700 hover:text-slate-900 border border-slate-200 rounded-xl hover:bg-slate-50 transition">
-          Sign In
-        </button>
-        <button onclick="showPortalAuthTab('register'); window.scrollTo({top: 0, behavior: 'smooth'});" class="px-3.5 py-1.5 text-xs font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 shadow-xs transition">
-          Create Account
-        </button>
-      </div>
+      <button onclick="showPortalAuthTab('login'); window.scrollTo({top: 0, behavior: 'smooth'});" class="px-4 py-2 text-xs font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 shadow-sm transition cursor-pointer">
+        Sign In
+      </button>
     `;
     return;
   }
 
-  // Show Admin Approvals tab if role is admin
-  if (currentUser.role === 'admin') {
-    if (adminTab) {
-      adminTab.classList.remove('hidden');
-      loadPendingApprovalsCount();
-    }
-  } else {
-    if (adminTab) adminTab.classList.add('hidden');
-  }
-
-  // Highlight matching switcher button
-  if (currentUser.email.startsWith('admin')) {
-    document.getElementById('role-btn-admin')?.classList.add('bg-white', 'shadow-xs', 'text-blue-700', 'font-bold');
-  } else if (currentUser.email.startsWith('alice')) {
-    document.getElementById('role-btn-alice')?.classList.add('bg-white', 'shadow-xs', 'text-blue-700', 'font-bold');
-  } else if (currentUser.email.startsWith('bob')) {
-    document.getElementById('role-btn-bob')?.classList.add('bg-white', 'shadow-xs', 'text-blue-700', 'font-bold');
-  } else if (currentUser.email.startsWith('charlie')) {
-    document.getElementById('role-btn-charlie')?.classList.add('bg-white', 'shadow-xs', 'text-blue-700', 'font-bold');
-  }
-
-  const roleColors = {
+  const roleBadgeColor = {
     admin: 'bg-purple-100 text-purple-800 border-purple-200',
     owner: 'bg-blue-100 text-blue-800 border-blue-200',
     viewer: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-  };
+  }[currentUser.role] || 'bg-slate-100 text-slate-800 border-slate-200';
+
+  // Toggle Admin Approvals Tab in Dashboard
+  const adminTab = document.getElementById('tab-btn-approvals');
+  if (adminTab) {
+    if (currentUser.role === 'admin') {
+      adminTab.classList.remove('hidden');
+      loadPendingApprovalsCount();
+    } else {
+      adminTab.classList.add('hidden');
+    }
+  }
+
+  // Get user initials
+  const initials = (currentUser.name || 'User')
+    .split(' ')
+    .map(p => p[0])
+    .join('')
+    .substring(0, 2)
+    .toUpperCase();
 
   container.innerHTML = `
     <div class="flex items-center gap-3">
-      <div class="flex items-center gap-2.5 bg-slate-100 py-1.5 px-3 rounded-xl border border-slate-200">
-        <div class="w-7 h-7 rounded-lg bg-slate-900 text-white flex items-center justify-center font-bold text-xs uppercase">
-          ${currentUser.name.charAt(0)}
+      <div class="flex items-center gap-2 bg-slate-100/90 py-1 px-2.5 rounded-xl border border-slate-200">
+        <div class="w-7 h-7 rounded-lg bg-blue-600 text-white font-bold flex items-center justify-center text-xs shadow-xs">
+          ${initials}
         </div>
-        <div class="text-left hidden sm:block">
-          <p class="text-xs font-bold text-slate-900 leading-tight">${currentUser.name}</p>
-          <p class="text-[10px] text-slate-500">${currentUser.email}</p>
+        <div class="flex flex-col text-left">
+          <span class="text-xs font-bold text-slate-900 leading-tight">${currentUser.name}</span>
+          <span class="text-[10px] text-slate-500 font-mono leading-tight">${currentUser.email}</span>
         </div>
-        <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${roleColors[currentUser.role] || 'bg-slate-200'}">
+        <span class="ml-1 text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full border ${roleBadgeColor}">
           ${currentUser.role}
         </span>
       </div>
 
-      <button onclick="clearSession()" class="p-2 text-slate-400 hover:text-rose-600 rounded-xl hover:bg-rose-50 transition" title="Log out">
+      <button onclick="clearSession()" class="px-3 py-1.5 text-xs font-semibold text-slate-600 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition cursor-pointer flex items-center gap-1.5" title="Sign Out">
         <i data-lucide="log-out" class="w-4 h-4"></i>
+        <span class="hidden sm:inline">Sign Out</span>
       </button>
     </div>
   `;
@@ -218,17 +198,13 @@ function showPortalAuthTab(tab) {
   if (tab === 'login') {
     tabHeader?.classList.remove('hidden');
     loginView?.classList.remove('hidden');
-    tabBtnLogin?.classList.add('active', 'border-blue-600', 'text-blue-600', 'font-bold');
-    tabBtnLogin?.classList.remove('text-slate-500', 'border-transparent');
-    tabBtnRegister?.classList.remove('active', 'border-blue-600', 'text-blue-600', 'font-bold');
-    tabBtnRegister?.classList.add('text-slate-500', 'border-transparent');
+    tabBtnLogin?.classList.add('active');
+    tabBtnRegister?.classList.remove('active');
   } else if (tab === 'register') {
     tabHeader?.classList.remove('hidden');
     registerView?.classList.remove('hidden');
-    tabBtnRegister?.classList.add('active', 'border-blue-600', 'text-blue-600', 'font-bold');
-    tabBtnRegister?.classList.remove('text-slate-500', 'border-transparent');
-    tabBtnLogin?.classList.remove('active', 'border-blue-600', 'text-blue-600', 'font-bold');
-    tabBtnLogin?.classList.add('text-slate-500', 'border-transparent');
+    tabBtnRegister?.classList.add('active');
+    tabBtnLogin?.classList.remove('active');
   } else if (tab === 'otp') {
     tabHeader?.classList.add('hidden');
     otpView?.classList.remove('hidden');
@@ -240,55 +216,17 @@ function showPortalAuthTab(tab) {
   if (window.lucide) lucide.createIcons();
 }
 
-/**
- * Modal Management & Tab Switching (Fallback overlay)
- */
 function openLoginModal(initialTab = 'login') {
-  document.getElementById('modal-auth')?.classList.remove('hidden');
-  showAuthTab(initialTab);
+  showPortalAuthTab(initialTab);
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 function closeLoginModal() {
-  document.getElementById('modal-auth')?.classList.add('hidden');
+  // Obsolete helper maintained for backwards compatibility
 }
 
 function showAuthTab(tab) {
-  const loginView = document.getElementById('auth-view-login');
-  const registerView = document.getElementById('auth-view-register');
-  const otpView = document.getElementById('auth-view-otp');
-  const adminCodeView = document.getElementById('auth-view-admin-code');
-  const tabBtnLogin = document.getElementById('auth-tab-btn-login');
-  const tabBtnRegister = document.getElementById('auth-tab-btn-register');
-  const tabHeader = document.getElementById('auth-modal-tab-header');
-
-  loginView?.classList.add('hidden');
-  registerView?.classList.add('hidden');
-  otpView?.classList.add('hidden');
-  adminCodeView?.classList.add('hidden');
-
-  if (tab === 'login') {
-    tabHeader?.classList.remove('hidden');
-    loginView?.classList.remove('hidden');
-    tabBtnLogin?.classList.add('active', 'border-blue-600', 'text-blue-600', 'font-bold');
-    tabBtnLogin?.classList.remove('text-slate-500', 'border-transparent');
-    tabBtnRegister?.classList.remove('active', 'border-blue-600', 'text-blue-600', 'font-bold');
-    tabBtnRegister?.classList.add('text-slate-500', 'border-transparent');
-  } else if (tab === 'register') {
-    tabHeader?.classList.remove('hidden');
-    registerView?.classList.remove('hidden');
-    tabBtnRegister?.classList.add('active', 'border-blue-600', 'text-blue-600', 'font-bold');
-    tabBtnRegister?.classList.remove('text-slate-500', 'border-transparent');
-    tabBtnLogin?.classList.remove('active', 'border-blue-600', 'text-blue-600', 'font-bold');
-    tabBtnLogin?.classList.add('text-slate-500', 'border-transparent');
-  } else if (tab === 'otp') {
-    tabHeader?.classList.add('hidden');
-    otpView?.classList.remove('hidden');
-  } else if (tab === 'admin-code') {
-    tabHeader?.classList.add('hidden');
-    adminCodeView?.classList.remove('hidden');
-  }
-
-  if (window.lucide) lucide.createIcons();
+  showPortalAuthTab(tab);
 }
 
 /**
@@ -304,71 +242,77 @@ function handleAccountStatusResponse(data) {
 
   if (data.account_status === 'PENDING_OTP' || data.requireRegistrationOTP || data.requireOTP) {
     showPortalAuthTab('otp');
-    showAuthTab('otp');
-    ['otp-target-email', 'portal-otp-target-email'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.textContent = data.email;
-    });
-    ['otp-status-text', 'portal-otp-status-text'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.textContent = data.message || 'Verification code dispatched to your email.';
-    });
+    const emailEl = document.getElementById('portal-otp-target-email');
+    if (emailEl) emailEl.textContent = data.email;
+
+    const statusEl = document.getElementById('portal-otp-status-text');
+    if (statusEl) statusEl.textContent = data.message || 'Verification code dispatched to your email.';
+
     if (data.devOtp) {
-      ['otp-dev-hint', 'portal-otp-dev-hint'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.textContent = `Demo Code: ${data.devOtp}`;
-      });
-      ['otp-code-input', 'portal-otp-code-input'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.value = data.devOtp;
-      });
+      const devHint = document.getElementById('portal-otp-dev-hint');
+      if (devHint) devHint.textContent = `Demo Verification Code: ${data.devOtp}`;
+      const codeInput = document.getElementById('portal-otp-code-input');
+      if (codeInput) codeInput.value = data.devOtp;
     }
   } else if (data.account_status === 'PENDING_ADMIN_CODE' || data.pendingAdminCode) {
     showPortalAuthTab('admin-code');
-    showAuthTab('admin-code');
-    ['admin-code-user-info', 'portal-admin-code-user-info'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.textContent = `User: ${data.email}`;
-    });
-    ['admin-code-status-pill', 'portal-admin-code-status-pill'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.textContent = 'Awaiting Administrator Review';
-    });
-    ['admin-code-notice', 'portal-admin-code-notice'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.textContent =
-        'Your email OTP is verified! Your Administrator has been notified to generate your Access Authorization Code. When you receive it, enter it below.';
-    });
+    const userEl = document.getElementById('portal-admin-code-user-info');
+    if (userEl) userEl.textContent = `User: ${data.email}`;
+
+    const pillEl = document.getElementById('portal-admin-code-status-pill');
+    if (pillEl) pillEl.textContent = 'Awaiting Administrator Review';
+
+    const noticeEl = document.getElementById('portal-admin-code-notice');
+    if (noticeEl) {
+      noticeEl.textContent =
+        'Your email OTP is verified! Your System Administrator has been notified to generate your Access Authorization Code. When you receive it, enter it below.';
+    }
   } else if (data.account_status === 'AWAITING_USER_CODE' || data.awaitingUserCode) {
     showPortalAuthTab('admin-code');
-    showAuthTab('admin-code');
-    ['admin-code-user-info', 'portal-admin-code-user-info'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.textContent = `User: ${data.email}`;
-    });
-    ['admin-code-status-pill', 'portal-admin-code-status-pill'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.textContent = 'Code Sent to Your Email!';
-    });
-    ['admin-code-notice', 'portal-admin-code-notice'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.textContent =
+    const userEl = document.getElementById('portal-admin-code-user-info');
+    if (userEl) userEl.textContent = `User: ${data.email}`;
+
+    const pillEl = document.getElementById('portal-admin-code-status-pill');
+    if (pillEl) pillEl.textContent = 'Code Sent to Your Email!';
+
+    const noticeEl = document.getElementById('portal-admin-code-notice');
+    if (noticeEl) {
+      noticeEl.textContent =
         'The Administrator has dispatched your Authorization Code! Please check your email inbox and enter the code below to unlock your dashboard.';
-    });
+    }
   }
 }
 
 /**
- * Handle Portal & Modal Login
+ * Handle Portal Login
  */
 async function handlePortalLoginSubmit(e) {
   e.preventDefault();
-  const email = document.getElementById('portal-login-email').value;
-  const password = document.getElementById('portal-login-password').value;
-  const require2fa = document.getElementById('portal-login-require-2fa').checked;
+  const emailInput = document.getElementById('portal-login-email');
+  const passwordInput = document.getElementById('portal-login-password');
+  const require2fa = document.getElementById('portal-login-require-2fa')?.checked || false;
   const errorEl = document.getElementById('portal-login-error');
+  const submitBtn = e.target.querySelector('button[type="submit"]');
+
+  if (!emailInput || !passwordInput || !errorEl) return;
+
+  const email = emailInput.value.trim();
+  const password = passwordInput.value;
 
   errorEl.classList.add('hidden');
+  const origBtnText = submitBtn ? submitBtn.innerHTML : 'Sign In';
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = `
+      <span class="inline-flex items-center justify-center gap-2">
+        <svg class="animate-spin h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+        </svg>
+        Authenticating...
+      </span>
+    `;
+  }
 
   try {
     const res = await fetch('/api/auth/login', {
@@ -380,7 +324,18 @@ async function handlePortalLoginSubmit(e) {
     const data = await res.json();
 
     if (!res.ok) {
-      errorEl.textContent = data.error || 'Login failed.';
+      const msg = data.error || 'Invalid email or password.';
+      errorEl.innerHTML = `
+        <div class="flex flex-col gap-1 text-left">
+          <span class="font-bold text-rose-700">${msg}</span>
+          <span class="text-[11px] text-slate-600">
+            No account registered with this email yet? 
+            <button type="button" onclick="showPortalAuthTab('register')" class="text-blue-600 font-bold underline hover:text-blue-800 cursor-pointer">
+              Click here to Create Account
+            </button>
+          </span>
+        </div>
+      `;
       errorEl.classList.remove('hidden');
       return;
     }
@@ -393,23 +348,15 @@ async function handlePortalLoginSubmit(e) {
     if (data.require2FA) {
       pending2FA = data;
       showPortalAuthTab('otp');
-      ['otp-target-email', 'portal-otp-target-email'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.textContent = data.email;
-      });
-      ['otp-status-text', 'portal-otp-status-text'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.textContent = data.message;
-      });
+      const targetEl = document.getElementById('portal-otp-target-email');
+      if (targetEl) targetEl.textContent = data.email;
+      const statusEl = document.getElementById('portal-otp-status-text');
+      if (statusEl) statusEl.textContent = data.message;
       if (data.devOtp) {
-        ['otp-dev-hint', 'portal-otp-dev-hint'].forEach(id => {
-          const el = document.getElementById(id);
-          if (el) el.textContent = `Demo Code: ${data.devOtp}`;
-        });
-        ['otp-code-input', 'portal-otp-code-input'].forEach(id => {
-          const el = document.getElementById(id);
-          if (el) el.value = data.devOtp;
-        });
+        const devHint = document.getElementById('portal-otp-dev-hint');
+        if (devHint) devHint.textContent = `Demo Code: ${data.devOtp}`;
+        const codeInput = document.getElementById('portal-otp-code-input');
+        if (codeInput) codeInput.value = data.devOtp;
       }
       return;
     }
@@ -418,83 +365,34 @@ async function handlePortalLoginSubmit(e) {
     currentUser = data.user;
     showDashboard();
     renderAuthHeader();
-    showToast('Logged In', `Welcome back, ${currentUser.name}!`, 'success');
+    showToast('Authenticated', `Welcome back, ${currentUser.name}!`, 'success');
     if (typeof loadDocuments === 'function') loadDocuments();
     if (typeof updateStats === 'function') updateStats();
   } catch (err) {
     errorEl.textContent = err.message;
     errorEl.classList.remove('hidden');
-  }
-}
-
-async function handleLoginSubmit(e) {
-  e.preventDefault();
-  const email = document.getElementById('login-email').value;
-  const password = document.getElementById('login-password').value;
-  const require2fa = document.getElementById('login-require-2fa').checked;
-  const errorEl = document.getElementById('login-error');
-
-  errorEl.classList.add('hidden');
-
-  try {
-    const res = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password, require2fa }),
-    });
-
-    const data = await res.json();
-
-    if (!res.ok) {
-      errorEl.textContent = data.error || 'Login failed.';
-      errorEl.classList.remove('hidden');
-      return;
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = origBtnText;
     }
-
-    if (data.account_status && data.account_status !== 'ACTIVE') {
-      handleAccountStatusResponse(data);
-      return;
-    }
-
-    if (data.require2FA) {
-      pending2FA = data;
-      showAuthTab('otp');
-      document.getElementById('otp-target-email').textContent = data.email;
-      document.getElementById('otp-status-text').textContent = data.message;
-      if (data.devOtp) {
-        document.getElementById('otp-dev-hint').textContent = `Demo Code: ${data.devOtp}`;
-        document.getElementById('otp-code-input').value = data.devOtp;
-      }
-      return;
-    }
-
-    setToken(data.token);
-    currentUser = data.user;
-    showDashboard();
-    renderAuthHeader();
-    closeLoginModal();
-    showToast('Logged In', `Welcome back, ${currentUser.name}!`, 'success');
-    if (typeof loadDocuments === 'function') loadDocuments();
-    if (typeof updateStats === 'function') updateStats();
-  } catch (err) {
-    errorEl.textContent = err.message;
-    errorEl.classList.remove('hidden');
   }
 }
 
 /**
- * Handle Portal & Modal Registration
+ * Handle Portal Registration
  */
 async function handlePortalRegisterSubmit(e) {
   e.preventDefault();
-  const name = document.getElementById('portal-reg-name').value;
-  const email = document.getElementById('portal-reg-email').value;
-  const phone = document.getElementById('portal-reg-phone').value;
+  const name = document.getElementById('portal-reg-name').value.trim();
+  const email = document.getElementById('portal-reg-email').value.trim();
+  const phone = document.getElementById('portal-reg-phone').value.trim();
   const password = document.getElementById('portal-reg-password').value;
   const confirmPassword = document.getElementById('portal-reg-confirm-password').value;
   const role = document.querySelector('input[name="portal-reg-role"]:checked')?.value || 'viewer';
   const termsAccepted = document.getElementById('portal-reg-terms').checked;
   const errorEl = document.getElementById('portal-reg-error');
+  const submitBtn = e.target.querySelector('button[type="submit"]');
 
   errorEl.classList.add('hidden');
 
@@ -508,6 +406,20 @@ async function handlePortalRegisterSubmit(e) {
     errorEl.textContent = 'You must agree to the Terms of Service & Privacy Policy.';
     errorEl.classList.remove('hidden');
     return;
+  }
+
+  const origBtnText = submitBtn ? submitBtn.innerHTML : 'Create Account';
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = `
+      <span class="inline-flex items-center justify-center gap-2">
+        <svg class="animate-spin h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+        </svg>
+        Creating Account...
+      </span>
+    `;
   }
 
   try {
@@ -538,291 +450,170 @@ async function handlePortalRegisterSubmit(e) {
   } catch (err) {
     errorEl.textContent = err.message;
     errorEl.classList.remove('hidden');
-  }
-}
-
-async function handleRegisterSubmit(e) {
-  e.preventDefault();
-  const name = document.getElementById('reg-name').value;
-  const email = document.getElementById('reg-email').value;
-  const phone = document.getElementById('reg-phone').value;
-  const password = document.getElementById('reg-password').value;
-  const confirmPassword = document.getElementById('reg-confirm-password').value;
-  const role = document.querySelector('input[name="reg-role"]:checked')?.value || 'viewer';
-  const termsAccepted = document.getElementById('reg-terms').checked;
-  const errorEl = document.getElementById('reg-error');
-
-  errorEl.classList.add('hidden');
-
-  if (password !== confirmPassword) {
-    errorEl.textContent = 'Passwords do not match. Please verify.';
-    errorEl.classList.remove('hidden');
-    return;
-  }
-
-  if (!termsAccepted) {
-    errorEl.textContent = 'You must agree to the Terms of Service & Privacy Policy.';
-    errorEl.classList.remove('hidden');
-    return;
-  }
-
-  try {
-    const res = await fetch('/api/auth/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, email, phone, password, role, termsAccepted }),
-    });
-
-    const data = await res.json();
-
-    if (!res.ok) {
-      errorEl.textContent = data.error || 'Registration failed.';
-      errorEl.classList.remove('hidden');
-      return;
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = origBtnText;
     }
-
-    pendingRegistration = {
-      userId: data.userId,
-      email: data.email,
-      phone: data.phone,
-      name: data.name,
-      role: data.role,
-    };
-
-    showToast('Account Created', 'A 6-digit verification OTP has been sent to your email.', 'success');
-    handleAccountStatusResponse(data);
-  } catch (err) {
-    errorEl.textContent = err.message;
-    errorEl.classList.remove('hidden');
   }
 }
 
 /**
- * Handle Portal & Modal OTP Verification
+ * Handle Portal OTP Verification
  */
 async function handlePortalOtpSubmit(e) {
   e.preventDefault();
-  const otpCode = document.getElementById('portal-otp-code-input').value;
+  const code = document.getElementById('portal-otp-code-input').value.trim();
   const errorEl = document.getElementById('portal-otp-error');
+  const submitBtn = e.target.querySelector('button[type="submit"]');
+
   errorEl.classList.add('hidden');
 
-  if (pending2FA && !pendingRegistration) {
-    try {
-      const res = await fetch('/api/auth/verify-otp', {
+  const origBtnText = submitBtn ? submitBtn.innerHTML : 'Verify Code';
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = `
+      <span class="inline-flex items-center justify-center gap-2">
+        <svg class="animate-spin h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+        </svg>
+        Verifying...
+      </span>
+    `;
+  }
+
+  try {
+    if (pending2FA) {
+      const res = await fetch('/api/auth/verify-2fa', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: pending2FA.userId, otpCode }),
+        body: JSON.stringify({ userId: pending2FA.userId, otp: code }),
       });
 
       const data = await res.json();
+
       if (!res.ok) {
-        errorEl.textContent = data.error || 'Verification failed.';
+        errorEl.textContent = data.error || 'Invalid OTP code.';
         errorEl.classList.remove('hidden');
         return;
       }
 
       setToken(data.token);
       currentUser = data.user;
+      pending2FA = null;
       showDashboard();
       renderAuthHeader();
       showToast('2FA Verified', `Welcome back, ${currentUser.name}!`, 'success');
       if (typeof loadDocuments === 'function') loadDocuments();
       if (typeof updateStats === 'function') updateStats();
       return;
-    } catch (err) {
-      errorEl.textContent = err.message;
+    }
+
+    if (!pendingRegistration) {
+      errorEl.textContent = 'Session expired. Please restart registration.';
       errorEl.classList.remove('hidden');
       return;
     }
-  }
 
-  if (!pendingRegistration || !pendingRegistration.userId) {
-    errorEl.textContent = 'Session expired. Please sign in or register again.';
-    errorEl.classList.remove('hidden');
-    return;
-  }
-
-  try {
     const res = await fetch('/api/auth/verify-registration-otp', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: pendingRegistration.userId, otpCode }),
+      body: JSON.stringify({ userId: pendingRegistration.userId, otp: code }),
     });
 
     const data = await res.json();
 
     if (!res.ok) {
-      errorEl.textContent = data.error || 'Invalid OTP code.';
+      errorEl.textContent = data.error || 'Verification code failed.';
       errorEl.classList.remove('hidden');
       return;
     }
 
-    showToast('Email Verified!', 'Administrator notified to issue your Authorization Code.', 'success');
+    showToast('Email Verified!', data.message, 'success');
     handleAccountStatusResponse(data);
   } catch (err) {
     errorEl.textContent = err.message;
     errorEl.classList.remove('hidden');
-  }
-}
-
-async function handleOtpSubmit(e) {
-  e.preventDefault();
-  const otpCode = document.getElementById('otp-code-input').value;
-  const errorEl = document.getElementById('otp-error');
-  errorEl.classList.add('hidden');
-
-  if (pending2FA && !pendingRegistration) {
-    try {
-      const res = await fetch('/api/auth/verify-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: pending2FA.userId, otpCode }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        errorEl.textContent = data.error || 'Verification failed.';
-        errorEl.classList.remove('hidden');
-        return;
-      }
-
-      setToken(data.token);
-      currentUser = data.user;
-      showDashboard();
-      renderAuthHeader();
-      closeLoginModal();
-      showToast('2FA Verified', `Welcome back, ${currentUser.name}!`, 'success');
-      if (typeof loadDocuments === 'function') loadDocuments();
-      if (typeof updateStats === 'function') updateStats();
-      return;
-    } catch (err) {
-      errorEl.textContent = err.message;
-      errorEl.classList.remove('hidden');
-      return;
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = origBtnText;
     }
-  }
-
-  if (!pendingRegistration || !pendingRegistration.userId) {
-    errorEl.textContent = 'Session expired. Please sign in or register again.';
-    errorEl.classList.remove('hidden');
-    return;
-  }
-
-  try {
-    const res = await fetch('/api/auth/verify-registration-otp', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: pendingRegistration.userId, otpCode }),
-    });
-
-    const data = await res.json();
-
-    if (!res.ok) {
-      errorEl.textContent = data.error || 'Invalid OTP code.';
-      errorEl.classList.remove('hidden');
-      return;
-    }
-
-    showToast('Email Verified!', 'Administrator notified to issue your Authorization Code.', 'success');
-    handleAccountStatusResponse(data);
-  } catch (err) {
-    errorEl.textContent = err.message;
-    errorEl.classList.remove('hidden');
   }
 }
 
 /**
- * Handle Portal & Modal Admin Authorization Code Submit
+ * Handle Portal Admin Code Submit
  */
 async function handlePortalAdminCodeSubmit(e) {
   e.preventDefault();
-  const authCode = document.getElementById('portal-admin-code-input').value;
+  const code = document.getElementById('portal-admin-code-input').value.trim();
   const errorEl = document.getElementById('portal-admin-code-error');
+  const submitBtn = e.target.querySelector('button[type="submit"]');
+
   errorEl.classList.add('hidden');
 
-  if (!pendingRegistration || !pendingRegistration.userId) {
-    errorEl.textContent = 'User context lost. Please enter your email in the login tab first.';
+  if (!pendingRegistration) {
+    errorEl.textContent = 'Session state missing. Please sign in again.';
     errorEl.classList.remove('hidden');
     return;
   }
 
+  const origBtnText = submitBtn ? submitBtn.innerHTML : 'Unlock Vault';
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = `
+      <span class="inline-flex items-center justify-center gap-2">
+        <svg class="animate-spin h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+        </svg>
+        Unlocking Vault...
+      </span>
+    `;
+  }
+
   try {
-    const res = await fetch('/api/auth/verify-admin-code', {
+    const res = await fetch('/api/auth/submit-admin-code', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: pendingRegistration.userId, authCode }),
+      body: JSON.stringify({ userId: pendingRegistration.userId, code }),
     });
 
     const data = await res.json();
 
     if (!res.ok) {
-      errorEl.textContent = data.error || 'Invalid Authorization Code.';
+      errorEl.textContent = data.error || 'Invalid administrator authorization code.';
       errorEl.classList.remove('hidden');
       return;
     }
 
     setToken(data.token);
     currentUser = data.user;
+    pendingRegistration = null;
     showDashboard();
     renderAuthHeader();
-    showToast('Vault Unlocked!', `Account activated! Welcome, ${currentUser.name}.`, 'success');
-
+    showToast('Vault Unlocked!', `Access granted. Welcome, ${currentUser.name}!`, 'success');
     if (typeof loadDocuments === 'function') loadDocuments();
     if (typeof updateStats === 'function') updateStats();
   } catch (err) {
     errorEl.textContent = err.message;
     errorEl.classList.remove('hidden');
-  }
-}
-
-async function handleAdminCodeSubmit(e) {
-  e.preventDefault();
-  const authCode = document.getElementById('admin-code-input').value;
-  const errorEl = document.getElementById('admin-code-error');
-  errorEl.classList.add('hidden');
-
-  if (!pendingRegistration || !pendingRegistration.userId) {
-    errorEl.textContent = 'User context lost. Please enter your email in the login tab first.';
-    errorEl.classList.remove('hidden');
-    return;
-  }
-
-  try {
-    const res = await fetch('/api/auth/verify-admin-code', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: pendingRegistration.userId, authCode }),
-    });
-
-    const data = await res.json();
-
-    if (!res.ok) {
-      errorEl.textContent = data.error || 'Invalid Authorization Code.';
-      errorEl.classList.remove('hidden');
-      return;
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = origBtnText;
     }
-
-    setToken(data.token);
-    currentUser = data.user;
-    showDashboard();
-    renderAuthHeader();
-    closeLoginModal();
-    showToast('Vault Unlocked!', `Account activated! Welcome, ${currentUser.name}.`, 'success');
-
-    if (typeof loadDocuments === 'function') loadDocuments();
-    if (typeof updateStats === 'function') updateStats();
-  } catch (err) {
-    errorEl.textContent = err.message;
-    errorEl.classList.remove('hidden');
   }
 }
 
 /**
- * Polling/checking approval status for pending user
+ * Check Admin Approval Status
  */
 async function checkAdminApprovalStatus() {
   if (!pendingRegistration || !pendingRegistration.email) {
-    showToast('Notice', 'No active pending account. Please sign in.', 'info');
+    showToast('No User Session', 'Please sign in or register first.', 'error');
     return;
   }
 
@@ -849,25 +640,33 @@ async function checkAdminApprovalStatus() {
 }
 
 /**
- * Professional Google Social Auth Flow (Simulated / One-Click OAuth)
+ * Google Social Auth Flow
  */
-async function handleGoogleSignIn() {
-  const emailPrompt = prompt('Enter Google Workspace / Gmail account to authenticate:', 'user.trustvault@gmail.com');
-  if (!emailPrompt) return;
+function handleGoogleSignIn() {
+  openGoogleModal();
+}
 
-  const namePrompt = prompt('Enter display name for this Google Account:', 'Google User');
-  if (!namePrompt) return;
+function openGoogleModal() {
+  document.getElementById('modal-google-auth')?.classList.remove('hidden');
+  if (window.lucide) lucide.createIcons();
+}
 
-  const phonePrompt = prompt('Enter contact phone number for zero-trust identity verification:', '+15551234567');
+function closeGoogleModal() {
+  document.getElementById('modal-google-auth')?.classList.add('hidden');
+}
+
+async function executeGoogleAuth(email, name, phone) {
+  closeGoogleModal();
+  showToast('Google OAuth', `Connecting with ${email}...`, 'info');
 
   try {
     const res = await fetch('/api/auth/google', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        email: emailPrompt.trim(),
-        name: namePrompt.trim(),
-        phone: phonePrompt ? phonePrompt.trim() : null,
+        email: email.trim(),
+        name: name.trim(),
+        phone: phone ? phone.trim() : null,
         role: 'owner',
       }),
     });
@@ -888,7 +687,6 @@ async function handleGoogleSignIn() {
     currentUser = data.user;
     showDashboard();
     renderAuthHeader();
-    closeLoginModal();
     showToast('Google Authenticated', `Welcome, ${currentUser.name}!`, 'success');
     if (typeof loadDocuments === 'function') loadDocuments();
     if (typeof updateStats === 'function') updateStats();
@@ -909,15 +707,13 @@ function closeTermsModal() {
 }
 
 function acceptTermsFromModal() {
-  const termsCheckbox1 = document.getElementById('reg-terms');
-  const termsCheckbox2 = document.getElementById('portal-reg-terms');
-  if (termsCheckbox1) termsCheckbox1.checked = true;
-  if (termsCheckbox2) termsCheckbox2.checked = true;
+  const termsCheckbox = document.getElementById('portal-reg-terms');
+  if (termsCheckbox) termsCheckbox.checked = true;
   closeTermsModal();
 }
 
 /**
- * Admin Panel: Load Pending Approvals and Count
+ * Admin Panel: Load Pending Approvals Count & Table
  */
 async function loadPendingApprovalsCount() {
   const token = getToken();
@@ -1029,7 +825,7 @@ async function loadPendingApprovals() {
               />
               <button
                 onclick="handleAdminDispatchCode('${u.id}', 'code-input-${u.id}')"
-                class="px-3 py-1 text-xs font-semibold text-white bg-purple-600 hover:bg-purple-700 rounded-lg shadow-xs flex items-center gap-1 transition"
+                class="px-3 py-1 text-xs font-semibold text-white bg-purple-600 hover:bg-purple-700 rounded-lg shadow-xs flex items-center gap-1 transition cursor-pointer"
               >
                 <i data-lucide="send" class="w-3 h-3"></i> Send Code
               </button>

@@ -12,14 +12,29 @@ function setToken(token) {
   localStorage.setItem('trustvault_token', token);
 }
 
+function showAuthPortal() {
+  document.getElementById('auth-portal-view')?.classList.remove('hidden');
+  document.getElementById('main-dashboard-container')?.classList.add('hidden');
+  document.getElementById('top-bar-judge-switcher')?.classList.add('hidden');
+  showPortalAuthTab('login');
+  if (window.lucide) lucide.createIcons();
+}
+
+function showDashboard() {
+  document.getElementById('auth-portal-view')?.classList.add('hidden');
+  document.getElementById('main-dashboard-container')?.classList.remove('hidden');
+  document.getElementById('top-bar-judge-switcher')?.classList.remove('hidden');
+  closeLoginModal();
+  if (window.lucide) lucide.createIcons();
+}
+
 function clearSession() {
   localStorage.removeItem('trustvault_token');
   currentUser = null;
   pendingRegistration = null;
   pending2FA = null;
   renderAuthHeader();
-  if (typeof loadDocuments === 'function') loadDocuments();
-  if (typeof updateStats === 'function') updateStats();
+  showAuthPortal();
   
   // Hide admin tab
   const adminTab = document.getElementById('tab-btn-approvals');
@@ -32,8 +47,8 @@ function clearSession() {
 async function initAuth() {
   const token = getToken();
   if (!token) {
-    // Default to Alice (Owner) for instant frictionless evaluator demo
-    await quickLogin('alice@trustvault.local', 'OwnerPassword123!');
+    // Show the first landing / login & registration portal page
+    showAuthPortal();
     return;
   }
 
@@ -45,7 +60,10 @@ async function initAuth() {
     if (res.ok) {
       const data = await res.json();
       currentUser = data.user;
+      showDashboard();
       renderAuthHeader();
+      if (typeof loadDocuments === 'function') loadDocuments();
+      if (typeof updateStats === 'function') updateStats();
     } else {
       clearSession();
     }
@@ -74,13 +92,13 @@ async function quickLogin(email, password) {
     }
 
     if (data.account_status && data.account_status !== 'ACTIVE') {
-      openLoginModal();
       handleAccountStatusResponse(data);
       return;
     }
 
     setToken(data.token);
     currentUser = data.user;
+    showDashboard();
     renderAuthHeader();
     showToast('Role Switched', `Active Session: ${currentUser.name} (${currentUser.role.toUpperCase()})`, 'success');
 
@@ -112,10 +130,10 @@ function renderAuthHeader() {
     if (adminTab) adminTab.classList.add('hidden');
     container.innerHTML = `
       <div class="flex items-center gap-2">
-        <button onclick="openLoginModal('login')" class="px-3.5 py-1.5 text-xs font-semibold text-slate-700 hover:text-slate-900 border border-slate-200 rounded-xl hover:bg-slate-50 transition">
+        <button onclick="showPortalAuthTab('login'); window.scrollTo({top: 0, behavior: 'smooth'});" class="px-3.5 py-1.5 text-xs font-semibold text-slate-700 hover:text-slate-900 border border-slate-200 rounded-xl hover:bg-slate-50 transition">
           Sign In
         </button>
-        <button onclick="openLoginModal('register')" class="px-3.5 py-1.5 text-xs font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 shadow-xs transition">
+        <button onclick="showPortalAuthTab('register'); window.scrollTo({top: 0, behavior: 'smooth'});" class="px-3.5 py-1.5 text-xs font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 shadow-xs transition">
           Create Account
         </button>
       </div>
@@ -181,7 +199,49 @@ function renderAuthHeader() {
 }
 
 /**
- * Modal Management & Tab Switching
+ * Portal View Tab Switching (Sign In vs Register vs OTP vs Admin Code)
+ */
+function showPortalAuthTab(tab) {
+  const loginView = document.getElementById('portal-view-login');
+  const registerView = document.getElementById('portal-view-register');
+  const otpView = document.getElementById('portal-view-otp');
+  const adminCodeView = document.getElementById('portal-view-admin-code');
+  const tabBtnLogin = document.getElementById('portal-tab-btn-login');
+  const tabBtnRegister = document.getElementById('portal-tab-btn-register');
+  const tabHeader = document.getElementById('auth-portal-tab-header');
+
+  loginView?.classList.add('hidden');
+  registerView?.classList.add('hidden');
+  otpView?.classList.add('hidden');
+  adminCodeView?.classList.add('hidden');
+
+  if (tab === 'login') {
+    tabHeader?.classList.remove('hidden');
+    loginView?.classList.remove('hidden');
+    tabBtnLogin?.classList.add('border-blue-600', 'text-blue-600', 'font-bold');
+    tabBtnLogin?.classList.remove('text-slate-500', 'border-transparent');
+    tabBtnRegister?.classList.remove('border-blue-600', 'text-blue-600', 'font-bold');
+    tabBtnRegister?.classList.add('text-slate-500', 'border-transparent');
+  } else if (tab === 'register') {
+    tabHeader?.classList.remove('hidden');
+    registerView?.classList.remove('hidden');
+    tabBtnRegister?.classList.add('border-blue-600', 'text-blue-600', 'font-bold');
+    tabBtnRegister?.classList.remove('text-slate-500', 'border-transparent');
+    tabBtnLogin?.classList.remove('border-blue-600', 'text-blue-600', 'font-bold');
+    tabBtnLogin?.classList.add('text-slate-500', 'border-transparent');
+  } else if (tab === 'otp') {
+    tabHeader?.classList.add('hidden');
+    otpView?.classList.remove('hidden');
+  } else if (tab === 'admin-code') {
+    tabHeader?.classList.add('hidden');
+    adminCodeView?.classList.remove('hidden');
+  }
+
+  if (window.lucide) lucide.createIcons();
+}
+
+/**
+ * Modal Management & Tab Switching (Fallback overlay)
  */
 function openLoginModal(initialTab = 'login') {
   document.getElementById('modal-auth')?.classList.remove('hidden');
@@ -201,7 +261,6 @@ function showAuthTab(tab) {
   const tabBtnRegister = document.getElementById('auth-tab-btn-register');
   const tabHeader = document.getElementById('auth-modal-tab-header');
 
-  // Hide all step views first
   loginView?.classList.add('hidden');
   registerView?.classList.add('hidden');
   otpView?.classList.add('hidden');
@@ -244,31 +303,130 @@ function handleAccountStatusResponse(data) {
   };
 
   if (data.account_status === 'PENDING_OTP' || data.requireRegistrationOTP || data.requireOTP) {
+    showPortalAuthTab('otp');
     showAuthTab('otp');
-    document.getElementById('otp-target-email').textContent = data.email;
-    document.getElementById('otp-status-text').textContent = data.message || 'Verification code dispatched to your email.';
+    ['otp-target-email', 'portal-otp-target-email'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = data.email;
+    });
+    ['otp-status-text', 'portal-otp-status-text'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = data.message || 'Verification code dispatched to your email.';
+    });
     if (data.devOtp) {
-      document.getElementById('otp-dev-hint').textContent = `Demo Code: ${data.devOtp}`;
-      document.getElementById('otp-code-input').value = data.devOtp;
+      ['otp-dev-hint', 'portal-otp-dev-hint'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = `Demo Code: ${data.devOtp}`;
+      });
+      ['otp-code-input', 'portal-otp-code-input'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = data.devOtp;
+      });
     }
   } else if (data.account_status === 'PENDING_ADMIN_CODE' || data.pendingAdminCode) {
+    showPortalAuthTab('admin-code');
     showAuthTab('admin-code');
-    document.getElementById('admin-code-user-info').textContent = `User: ${data.email}`;
-    document.getElementById('admin-code-status-pill').textContent = 'Awaiting Administrator Review';
-    document.getElementById('admin-code-notice').textContent =
-      'Your email OTP is verified! Your Administrator has been notified to generate your Access Authorization Code. When you receive it, enter it below.';
+    ['admin-code-user-info', 'portal-admin-code-user-info'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = `User: ${data.email}`;
+    });
+    ['admin-code-status-pill', 'portal-admin-code-status-pill'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = 'Awaiting Administrator Review';
+    });
+    ['admin-code-notice', 'portal-admin-code-notice'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.textContent =
+        'Your email OTP is verified! Your Administrator has been notified to generate your Access Authorization Code. When you receive it, enter it below.';
+    });
   } else if (data.account_status === 'AWAITING_USER_CODE' || data.awaitingUserCode) {
+    showPortalAuthTab('admin-code');
     showAuthTab('admin-code');
-    document.getElementById('admin-code-user-info').textContent = `User: ${data.email}`;
-    document.getElementById('admin-code-status-pill').textContent = 'Code Sent to Your Email!';
-    document.getElementById('admin-code-notice').textContent =
-      'The Administrator has dispatched your Authorization Code! Please check your email inbox and enter the code below to unlock your dashboard.';
+    ['admin-code-user-info', 'portal-admin-code-user-info'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = `User: ${data.email}`;
+    });
+    ['admin-code-status-pill', 'portal-admin-code-status-pill'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = 'Code Sent to Your Email!';
+    });
+    ['admin-code-notice', 'portal-admin-code-notice'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.textContent =
+        'The Administrator has dispatched your Authorization Code! Please check your email inbox and enter the code below to unlock your dashboard.';
+    });
   }
 }
 
 /**
- * Handle Login Form Submit
+ * Handle Portal & Modal Login
  */
+async function handlePortalLoginSubmit(e) {
+  e.preventDefault();
+  const email = document.getElementById('portal-login-email').value;
+  const password = document.getElementById('portal-login-password').value;
+  const require2fa = document.getElementById('portal-login-require-2fa').checked;
+  const errorEl = document.getElementById('portal-login-error');
+
+  errorEl.classList.add('hidden');
+
+  try {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password, require2fa }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      errorEl.textContent = data.error || 'Login failed.';
+      errorEl.classList.remove('hidden');
+      return;
+    }
+
+    if (data.account_status && data.account_status !== 'ACTIVE') {
+      handleAccountStatusResponse(data);
+      return;
+    }
+
+    if (data.require2FA) {
+      pending2FA = data;
+      showPortalAuthTab('otp');
+      ['otp-target-email', 'portal-otp-target-email'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = data.email;
+      });
+      ['otp-status-text', 'portal-otp-status-text'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = data.message;
+      });
+      if (data.devOtp) {
+        ['otp-dev-hint', 'portal-otp-dev-hint'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.textContent = `Demo Code: ${data.devOtp}`;
+        });
+        ['otp-code-input', 'portal-otp-code-input'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.value = data.devOtp;
+        });
+      }
+      return;
+    }
+
+    setToken(data.token);
+    currentUser = data.user;
+    showDashboard();
+    renderAuthHeader();
+    showToast('Logged In', `Welcome back, ${currentUser.name}!`, 'success');
+    if (typeof loadDocuments === 'function') loadDocuments();
+    if (typeof updateStats === 'function') updateStats();
+  } catch (err) {
+    errorEl.textContent = err.message;
+    errorEl.classList.remove('hidden');
+  }
+}
+
 async function handleLoginSubmit(e) {
   e.preventDefault();
   const email = document.getElementById('login-email').value;
@@ -312,6 +470,7 @@ async function handleLoginSubmit(e) {
 
     setToken(data.token);
     currentUser = data.user;
+    showDashboard();
     renderAuthHeader();
     closeLoginModal();
     showToast('Logged In', `Welcome back, ${currentUser.name}!`, 'success');
@@ -324,8 +483,64 @@ async function handleLoginSubmit(e) {
 }
 
 /**
- * Handle Registration Form Submit
+ * Handle Portal & Modal Registration
  */
+async function handlePortalRegisterSubmit(e) {
+  e.preventDefault();
+  const name = document.getElementById('portal-reg-name').value;
+  const email = document.getElementById('portal-reg-email').value;
+  const phone = document.getElementById('portal-reg-phone').value;
+  const password = document.getElementById('portal-reg-password').value;
+  const confirmPassword = document.getElementById('portal-reg-confirm-password').value;
+  const role = document.querySelector('input[name="portal-reg-role"]:checked')?.value || 'viewer';
+  const termsAccepted = document.getElementById('portal-reg-terms').checked;
+  const errorEl = document.getElementById('portal-reg-error');
+
+  errorEl.classList.add('hidden');
+
+  if (password !== confirmPassword) {
+    errorEl.textContent = 'Passwords do not match. Please verify.';
+    errorEl.classList.remove('hidden');
+    return;
+  }
+
+  if (!termsAccepted) {
+    errorEl.textContent = 'You must agree to the Terms of Service & Privacy Policy.';
+    errorEl.classList.remove('hidden');
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, email, phone, password, role, termsAccepted }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      errorEl.textContent = data.error || 'Registration failed.';
+      errorEl.classList.remove('hidden');
+      return;
+    }
+
+    pendingRegistration = {
+      userId: data.userId,
+      email: data.email,
+      phone: data.phone,
+      name: data.name,
+      role: data.role,
+    };
+
+    showToast('Account Created', 'A 6-digit verification OTP has been sent to your email.', 'success');
+    handleAccountStatusResponse(data);
+  } catch (err) {
+    errorEl.textContent = err.message;
+    errorEl.classList.remove('hidden');
+  }
+}
+
 async function handleRegisterSubmit(e) {
   e.preventDefault();
   const name = document.getElementById('reg-name').value;
@@ -383,15 +598,14 @@ async function handleRegisterSubmit(e) {
 }
 
 /**
- * Handle Email OTP Submit (Registration & 2FA)
+ * Handle Portal & Modal OTP Verification
  */
-async function handleOtpSubmit(e) {
+async function handlePortalOtpSubmit(e) {
   e.preventDefault();
-  const otpCode = document.getElementById('otp-code-input').value;
-  const errorEl = document.getElementById('otp-error');
+  const otpCode = document.getElementById('portal-otp-code-input').value;
+  const errorEl = document.getElementById('portal-otp-error');
   errorEl.classList.add('hidden');
 
-  // If this is a login 2FA OTP
   if (pending2FA && !pendingRegistration) {
     try {
       const res = await fetch('/api/auth/verify-otp', {
@@ -409,6 +623,72 @@ async function handleOtpSubmit(e) {
 
       setToken(data.token);
       currentUser = data.user;
+      showDashboard();
+      renderAuthHeader();
+      showToast('2FA Verified', `Welcome back, ${currentUser.name}!`, 'success');
+      if (typeof loadDocuments === 'function') loadDocuments();
+      if (typeof updateStats === 'function') updateStats();
+      return;
+    } catch (err) {
+      errorEl.textContent = err.message;
+      errorEl.classList.remove('hidden');
+      return;
+    }
+  }
+
+  if (!pendingRegistration || !pendingRegistration.userId) {
+    errorEl.textContent = 'Session expired. Please sign in or register again.';
+    errorEl.classList.remove('hidden');
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/auth/verify-registration-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: pendingRegistration.userId, otpCode }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      errorEl.textContent = data.error || 'Invalid OTP code.';
+      errorEl.classList.remove('hidden');
+      return;
+    }
+
+    showToast('Email Verified!', 'Administrator notified to issue your Authorization Code.', 'success');
+    handleAccountStatusResponse(data);
+  } catch (err) {
+    errorEl.textContent = err.message;
+    errorEl.classList.remove('hidden');
+  }
+}
+
+async function handleOtpSubmit(e) {
+  e.preventDefault();
+  const otpCode = document.getElementById('otp-code-input').value;
+  const errorEl = document.getElementById('otp-error');
+  errorEl.classList.add('hidden');
+
+  if (pending2FA && !pendingRegistration) {
+    try {
+      const res = await fetch('/api/auth/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: pending2FA.userId, otpCode }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        errorEl.textContent = data.error || 'Verification failed.';
+        errorEl.classList.remove('hidden');
+        return;
+      }
+
+      setToken(data.token);
+      currentUser = data.user;
+      showDashboard();
       renderAuthHeader();
       closeLoginModal();
       showToast('2FA Verified', `Welcome back, ${currentUser.name}!`, 'success');
@@ -422,7 +702,6 @@ async function handleOtpSubmit(e) {
     }
   }
 
-  // Otherwise, Registration OTP verification
   if (!pendingRegistration || !pendingRegistration.userId) {
     errorEl.textContent = 'Session expired. Please sign in or register again.';
     errorEl.classList.remove('hidden');
@@ -453,8 +732,49 @@ async function handleOtpSubmit(e) {
 }
 
 /**
- * Handle Admin Authorization Code Submit
+ * Handle Portal & Modal Admin Authorization Code Submit
  */
+async function handlePortalAdminCodeSubmit(e) {
+  e.preventDefault();
+  const authCode = document.getElementById('portal-admin-code-input').value;
+  const errorEl = document.getElementById('portal-admin-code-error');
+  errorEl.classList.add('hidden');
+
+  if (!pendingRegistration || !pendingRegistration.userId) {
+    errorEl.textContent = 'User context lost. Please enter your email in the login tab first.';
+    errorEl.classList.remove('hidden');
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/auth/verify-admin-code', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: pendingRegistration.userId, authCode }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      errorEl.textContent = data.error || 'Invalid Authorization Code.';
+      errorEl.classList.remove('hidden');
+      return;
+    }
+
+    setToken(data.token);
+    currentUser = data.user;
+    showDashboard();
+    renderAuthHeader();
+    showToast('Vault Unlocked!', `Account activated! Welcome, ${currentUser.name}.`, 'success');
+
+    if (typeof loadDocuments === 'function') loadDocuments();
+    if (typeof updateStats === 'function') updateStats();
+  } catch (err) {
+    errorEl.textContent = err.message;
+    errorEl.classList.remove('hidden');
+  }
+}
+
 async function handleAdminCodeSubmit(e) {
   e.preventDefault();
   const authCode = document.getElementById('admin-code-input').value;
@@ -484,6 +804,7 @@ async function handleAdminCodeSubmit(e) {
 
     setToken(data.token);
     currentUser = data.user;
+    showDashboard();
     renderAuthHeader();
     closeLoginModal();
     showToast('Vault Unlocked!', `Account activated! Welcome, ${currentUser.name}.`, 'success');
@@ -565,6 +886,7 @@ async function handleGoogleSignIn() {
 
     setToken(data.token);
     currentUser = data.user;
+    showDashboard();
     renderAuthHeader();
     closeLoginModal();
     showToast('Google Authenticated', `Welcome, ${currentUser.name}!`, 'success');
@@ -587,8 +909,10 @@ function closeTermsModal() {
 }
 
 function acceptTermsFromModal() {
-  const termsCheckbox = document.getElementById('reg-terms');
-  if (termsCheckbox) termsCheckbox.checked = true;
+  const termsCheckbox1 = document.getElementById('reg-terms');
+  const termsCheckbox2 = document.getElementById('portal-reg-terms');
+  if (termsCheckbox1) termsCheckbox1.checked = true;
+  if (termsCheckbox2) termsCheckbox2.checked = true;
   closeTermsModal();
 }
 
@@ -652,7 +976,6 @@ async function loadPendingApprovals() {
     const data = await res.json();
     const users = data.pendingUsers || [];
 
-    // Update badge
     const badge = document.getElementById('pending-badge');
     if (badge) {
       badge.textContent = users.length;

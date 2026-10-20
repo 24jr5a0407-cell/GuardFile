@@ -120,6 +120,8 @@ async function migrate() {
   await safeAlter('ALTER TABLE users ADD COLUMN admin_auth_code TEXT;');
   await safeAlter('ALTER TABLE users ADD COLUMN terms_accepted INTEGER DEFAULT 1;');
   await safeAlter('CREATE INDEX IF NOT EXISTS idx_users_phone ON users(phone);');
+  await safeAlter('ALTER TABLE audit_logs ADD COLUMN seq BIGSERIAL;');
+  await safeAlter('CREATE INDEX IF NOT EXISTS idx_audit_seq ON audit_logs(seq);');
 
   console.log('[Migration] Database schema migrated successfully.');
 }

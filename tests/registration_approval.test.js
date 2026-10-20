@@ -5,13 +5,19 @@ const { migrate } = require('../src/db/migrate');
 const { seed } = require('../src/db/seed');
 
 let adminToken;
+const uniqueId = Date.now();
+const testUser = {
+  name: 'Sarah Connor',
+  email: `sarah.connor.${uniqueId}@cyberdyne.org`,
+  phone: `+141555${Math.floor(100000 + Math.random() * 900000)}`,
+  password: 'SecurePass2026!#',
+  role: 'owner',
+  termsAccepted: true,
+};
 
 beforeAll(async () => {
   await migrate();
   await seed();
-
-  // Clean up any previous test runs for idempotency
-  await query("DELETE FROM users WHERE email IN ('sarah.connor@cyberdyne.org', 'different.email@cyberdyne.org')");
 
   const loginRes = await request(app)
     .post('/api/auth/login')
@@ -20,15 +26,6 @@ beforeAll(async () => {
 });
 
 describe('Zero-Trust Registration & Admin Authorization Flow', () => {
-  const testUser = {
-    name: 'Sarah Connor',
-    email: 'sarah.connor@cyberdyne.org',
-    phone: '+14155550199',
-    password: 'SecurePass2026!#',
-    role: 'owner',
-    termsAccepted: true,
-  };
-
   test('1. Registration fails if terms & conditions are not accepted', async () => {
     const res = await request(app)
       .post('/api/auth/register')
@@ -66,7 +63,7 @@ describe('Zero-Trust Registration & Admin Authorization Flow', () => {
       .post('/api/auth/register')
       .send({
         ...testUser,
-        email: 'different.email@cyberdyne.org', // Different email, duplicate phone
+        email: `different.email.${uniqueId}@cyberdyne.org`, // Different email, duplicate phone
       });
 
     expect(res.status).toBe(409);

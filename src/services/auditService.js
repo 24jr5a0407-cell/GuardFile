@@ -30,9 +30,16 @@ async function recordEvent({
 }) {
   try {
     // 1. Fetch latest entry to get previous block hash
-    const latestRes = await query(
-      'SELECT entry_hash FROM audit_logs ORDER BY timestamp DESC, id DESC LIMIT 1'
-    );
+    let latestRes;
+    try {
+      latestRes = await query(
+        'SELECT entry_hash FROM audit_logs ORDER BY seq DESC LIMIT 1'
+      );
+    } catch (e) {
+      latestRes = await query(
+        'SELECT entry_hash FROM audit_logs ORDER BY timestamp DESC, id DESC LIMIT 1'
+      );
+    }
     const prev_hash = (latestRes.rows && latestRes.rows.length > 0)
       ? latestRes.rows[0].entry_hash
       : GENESIS_HASH;
@@ -89,9 +96,16 @@ async function recordEvent({
  * Proves that no records have been altered, deleted, or inserted maliciously.
  */
 async function verifyChain() {
-  const result = await query(
-    'SELECT id, timestamp, actor_id, action, target_resource, ip_address, status, prev_hash, entry_hash FROM audit_logs ORDER BY timestamp ASC, id ASC'
-  );
+  let result;
+  try {
+    result = await query(
+      'SELECT id, timestamp, actor_id, action, target_resource, ip_address, status, prev_hash, entry_hash FROM audit_logs ORDER BY seq ASC'
+    );
+  } catch (e) {
+    result = await query(
+      'SELECT id, timestamp, actor_id, action, target_resource, ip_address, status, prev_hash, entry_hash FROM audit_logs ORDER BY timestamp ASC, id ASC'
+    );
+  }
 
   const logs = result.rows || [];
   if (logs.length === 0) {

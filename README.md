@@ -32,8 +32,8 @@ TrustVault is engineered to run seamlessly on **any machine** (Windows, macOS, L
 
 ```bash
 # 1. Clone repository
-git clone https://github.com/your-username/trustvault-guardfile.git
-cd trustvault-guardfile
+git clone https://github.com/Arshad-o/Guardfile.git
+cd Guardfile
 
 # 2. Install dependencies
 npm install

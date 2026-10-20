@@ -36,7 +36,7 @@ async function seed() {
   for (const u of users) {
     await query(
       `INSERT INTO users (id, name, email, phone, password_hash, role, account_status, terms_accepted)
-       VALUES ($1, $2, $3, $4, $5, $6, 'ACTIVE', 1)
+       VALUES ($1, $2, $3, $4, $5, $6, 'ACTIVE', TRUE)
        ON CONFLICT (email)
        DO UPDATE SET name = EXCLUDED.name, phone = EXCLUDED.phone, password_hash = EXCLUDED.password_hash, role = EXCLUDED.role, account_status = 'ACTIVE'`,
       [u.id, u.name, u.email, u.phone, u.hash, u.role]

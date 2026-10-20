@@ -61,7 +61,7 @@ router.post('/register', async (req, res) => {
     // Create user in PENDING_OTP status
     await query(
       `INSERT INTO users (id, name, email, phone, password_hash, role, account_status, terms_accepted)
-       VALUES ($1, $2, $3, $4, $5, $6, 'PENDING_OTP', 1)`,
+       VALUES ($1, $2, $3, $4, $5, $6, 'PENDING_OTP', TRUE)`,
       [userId, name.trim(), normalizedEmail, normalizedPhone, passwordHash, assignedRole]
     );
 
@@ -406,7 +406,7 @@ router.post('/google', async (req, res) => {
 
     await query(
       `INSERT INTO users (id, name, email, phone, password_hash, role, account_status, terms_accepted)
-       VALUES ($1, $2, $3, $4, $5, $6, 'PENDING_OTP', 1)`,
+       VALUES ($1, $2, $3, $4, $5, $6, 'PENDING_OTP', TRUE)`,
       [userId, name.trim(), normalizedEmail, assignedPhone, mockHash, assignedRole]
     );
 

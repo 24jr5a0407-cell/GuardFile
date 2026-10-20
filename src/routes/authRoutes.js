@@ -758,11 +758,15 @@ router.get('/me', authenticateToken, async (req, res) => {
 
 /**
  * GET /api/auth/users
- * Returns list of users for document sharing recipient picker.
+ * Returns list of users for document sharing recipient picker or admin directory.
  */
 router.get('/users', authenticateToken, async (req, res) => {
   try {
-    const userRes = await query('SELECT id, name, email, role FROM users WHERE account_status = \'ACTIVE\' ORDER BY name ASC');
+    let sql = 'SELECT id, name, email, role FROM users WHERE account_status = \'ACTIVE\' ORDER BY name ASC';
+    if (req.user && req.user.role === 'admin') {
+      sql = 'SELECT id, name, email, phone, role, account_status, created_at FROM users ORDER BY created_at DESC';
+    }
+    const userRes = await query(sql);
     res.json({ users: userRes.rows || [] });
   } catch (err) {
     res.status(500).json({ error: 'Failed to list users.' });

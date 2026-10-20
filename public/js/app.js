@@ -18,6 +18,9 @@ function switchTab(tabName) {
     loadAuditLogs();
   } else if (tabName === 'approvals') {
     loadPendingApprovals();
+    if (typeof loadAllUsers === 'function') {
+      loadAllUsers();
+    }
   }
 }
 

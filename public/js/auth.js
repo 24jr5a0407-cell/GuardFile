@@ -1553,6 +1553,9 @@ async function handleAdminDispatchCode(userId, inputId, roleSelectId) {
     showToast('Code Dispatched!', data.message, 'success');
     loadPendingApprovals();
     loadPendingApprovalsCount();
+    if (typeof loadAllUsers === 'function') {
+      loadAllUsers();
+    }
   } catch (err) {
     showToast('Error', err.message, 'error');
     if (dispatchBtn) {
@@ -1561,7 +1564,147 @@ async function handleAdminDispatchCode(userId, inputId, roleSelectId) {
     }
   }
 }
+
+/**
+ * Admin Panel: Load All System Users & Manage Roles
+ */
+async function loadAllUsers() {
+  const token = getToken();
+  if (!token || !currentUser || currentUser.role !== 'admin') return;
+
+  const tbody = document.getElementById('all-users-table-body');
+  if (!tbody) return;
+
+  tbody.innerHTML = `
+    <tr>
+      <td colspan="5" class="py-8 text-center text-slate-400">
+        <i data-lucide="loader" class="w-5 h-5 animate-spin mx-auto mb-1 text-blue-600"></i>
+        Loading user directory...
+      </td>
+    </tr>
+  `;
+  if (window.lucide) lucide.createIcons();
+
+  try {
+    const res = await fetch('/api/auth/users', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) {
+      tbody.innerHTML = `<tr><td colspan="5" class="py-6 text-center text-rose-500 font-sans">Failed to load user directory.</td></tr>`;
+      return;
+    }
+    const data = await res.json();
+    const users = data.users || [];
+    if (users.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="5" class="py-6 text-center text-slate-400 font-sans">No users registered yet.</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = users.map(u => {
+      const isSelf = u.id === currentUser.id;
+      const isAdmin = u.role === 'admin';
+
+      let statusBadge = '<span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 font-bold">ACTIVE</span>';
+      if (u.account_status === 'AWAITING_ADMIN_APPROVAL' || u.account_status === 'PENDING_ADMIN_CODE') {
+        statusBadge = '<span class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200 font-bold animate-pulse">AWAITING CODE</span>';
+      } else if (u.account_status === 'AWAITING_USER_CODE') {
+        statusBadge = '<span class="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 border border-blue-200 font-bold">CODE DISPATCHED</span>';
+      } else if (u.account_status === 'PENDING_OTP') {
+        statusBadge = '<span class="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 font-bold">PENDING OTP</span>';
+      }
+
+      return `
+        <tr class="hover:bg-slate-50 transition">
+          <td class="py-3.5 px-4">
+            <div class="font-bold text-slate-900 font-sans text-xs flex items-center gap-1.5">
+              ${u.name}
+              ${isSelf ? '<span class="text-[10px] bg-purple-100 text-purple-700 font-bold px-1.5 py-0.5 rounded-md border border-purple-200">You</span>' : ''}
+            </div>
+            <div class="text-slate-500 text-[10px] font-mono">${u.email}</div>
+          </td>
+          <td class="py-3.5 px-4 font-mono text-slate-700">${u.phone || '—'}</td>
+          <td class="py-3.5 px-4">${statusBadge}</td>
+          <td class="py-3.5 px-4">
+            ${isAdmin ? `
+              <span class="px-2.5 py-1 rounded-lg bg-purple-100 text-purple-800 border border-purple-200 font-bold text-xs inline-flex items-center gap-1 font-sans">
+                <i data-lucide="shield" class="w-3 h-3 text-purple-600"></i> Administrator
+              </span>
+            ` : `
+              <select
+                id="role-change-${u.id}"
+                class="px-2.5 py-1 text-xs font-semibold rounded-lg border border-slate-200 bg-white text-slate-800 focus:ring-1 focus:ring-blue-500 cursor-pointer shadow-xs"
+              >
+                <option value="owner" ${u.role === 'owner' ? 'selected' : ''}>Document Owner</option>
+                <option value="viewer" ${u.role === 'viewer' ? 'selected' : ''}>Document Viewer</option>
+              </select>
+            `}
+          </td>
+          <td class="py-3.5 px-4">
+            ${isAdmin ? `<span class="text-xs text-slate-400 font-sans">Master Admin</span>` : `
+              <button
+                type="button"
+                id="role-btn-${u.id}"
+                onclick="handleUpdateUserRole('${u.id}', document.getElementById('role-change-${u.id}').value)"
+                class="px-3 py-1 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200 transition cursor-pointer flex items-center gap-1"
+              >
+                <i data-lucide="check" class="w-3 h-3"></i> Apply Role
+              </button>
+            `}
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    try {
+      if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
+    } catch (e) {}
+  } catch (err) {
+    console.error('Failed to load users directory:', err);
+    tbody.innerHTML = `<tr><td colspan="5" class="py-6 text-center text-rose-500 font-sans">Error: ${err.message}</td></tr>`;
+  }
+}
+
+/**
+ * Administrator updates a user role
+ */
+async function handleUpdateUserRole(userId, newRole) {
+  const token = getToken();
+  if (!token) return;
+
+  const btn = document.getElementById(`role-btn-${userId}`);
+  const originalHtml = btn ? btn.innerHTML : 'Apply Role';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = `<span class="inline-flex items-center gap-1"><svg class="animate-spin h-3 w-3 text-blue-600" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg> Updating...</span>`;
+  }
+
+  try {
+    const res = await fetch('/api/auth/set-user-role', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ userId, role: newRole }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      showToast('Update Failed', data.error || 'Failed to update user role', 'error');
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+      }
+      return;
+    }
+
+    showToast('Role Updated', data.message || `User role updated to ${newRole}.`, 'success');
+    loadAllUsers();
   } catch (err) {
     showToast('Error', err.message, 'error');
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = originalHtml;
+    }
   }
 }

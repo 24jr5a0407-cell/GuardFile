@@ -16,39 +16,32 @@ async function sendOtp(userId, email, purpose = 'Login Verification') {
   );
 
   const emailHtml = `
-    <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 520px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff;">
-      <div style="text-align: center; margin-bottom: 24px;">
-        <h1 style="color: #0f172a; margin: 0; font-size: 24px; font-weight: 700;">TrustVault</h1>
-        <p style="color: #64748b; font-size: 14px; margin-top: 4px;">Zero-Trust Document Security Engine</p>
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px; background: #ffffff; border: 1px solid #e5e7eb; border-radius: 12px;">
+      <div style="margin-bottom: 20px;">
+        <span style="font-size: 20px; font-weight: 700; color: #111827; letter-spacing: -0.5px;">GuardFile</span>
       </div>
-      <div style="background: #f8fafc; border-radius: 8px; padding: 20px; text-align: center; margin-bottom: 20px;">
-        <p style="color: #334155; font-size: 15px; margin: 0 0 12px 0;">Your one-time security authorization code for <strong>${purpose}</strong> is:</p>
-        <div style="font-size: 32px; font-weight: 800; letter-spacing: 6px; color: #2563eb; padding: 12px; background: #ffffff; border-radius: 6px; border: 1px dashed #cbd5e1; display: inline-block;">
-          ${otp}
-        </div>
-        <p style="color: #94a3b8; font-size: 12px; margin-top: 12px;">This code will expire in 5 minutes. Never disclose this code to anyone.</p>
+      <p style="font-size: 15px; color: #374151; margin-bottom: 16px; line-height: 1.5;">
+        Your verification code is:
+      </p>
+      <div style="background: #f3f4f6; border-radius: 8px; padding: 16px; text-align: center; margin-bottom: 16px;">
+        <span style="font-size: 32px; font-weight: 700; letter-spacing: 6px; color: #1d4ed8; font-family: monospace;">${otp}</span>
       </div>
-      <p style="color: #64748b; font-size: 12px; text-align: center; margin: 0;">
-        If you did not request this verification code, an unauthorized attempt was intercepted by TrustVault.
+      <p style="font-size: 13px; color: #6b7280; line-height: 1.5; margin-bottom: 0;">
+        This code expires in 5 minutes. If you did not request this, please ignore this email.
       </p>
     </div>
   `;
 
-  const emailText = `Your TrustVault verification code for ${purpose} is: ${otp}\n\nThis verification code expires in 5 minutes. Never share this code with anyone.\n\nIf you did not request this verification code, please ignore this email.`;
+  const emailText = `Your GuardFile verification code is: ${otp}\n\nThis code expires in 5 minutes. If you did not request this, please ignore this email.`;
 
   let delivered = false;
   try {
     const info = await transporter.sendMail({
-      from: `"TrustVault Security" <${smtpUser}>`,
+      from: `"GuardFile" <${smtpUser}>`,
       to: email,
-      subject: `Your TrustVault Security Verification Code: ${otp}`,
+      subject: `${otp} is your GuardFile verification code`,
       text: emailText,
       html: emailHtml,
-      headers: {
-        'X-Priority': '1 (Highest)',
-        'X-MSMail-Priority': 'High',
-        'Importance': 'High',
-      },
     });
     console.log(`[OTP Service] Email dispatched to ${email}: ${info.messageId}`);
     delivered = true;
@@ -134,9 +127,10 @@ async function notifyAdminPendingApproval(user) {
 
   try {
     await transporter.sendMail({
-      from: `"TrustVault Security" <${smtpUser}>`,
+      from: `"GuardFile" <${smtpUser}>`,
       to: adminEmail,
-      subject: `[TrustVault Alert] Action Required: New User ${user.name} Awaiting Approval`,
+      subject: `[New User Approval] ${user.name} (${user.email})`,
+      text: `A new user ${user.name} (${user.email}, ${user.role}) has verified their email OTP and is awaiting your authorization code in the GuardFile Admin Dashboard.`,
       html: emailHtml,
     });
     console.log(`[Admin Notification] Dispatched alert to ${adminEmail} for user ${user.email}`);
@@ -152,39 +146,34 @@ async function notifyAdminPendingApproval(user) {
  */
 async function sendAdminApprovalCode(userEmail, code, userName) {
   const emailHtml = `
-    <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 520px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff;">
-      <div style="text-align: center; margin-bottom: 24px;">
-        <h1 style="color: #0f172a; margin: 0; font-size: 24px; font-weight: 700;">TrustVault</h1>
-        <p style="color: #64748b; font-size: 14px; margin-top: 4px;">Zero-Trust Document Security Engine</p>
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px; background: #ffffff; border: 1px solid #e5e7eb; border-radius: 12px;">
+      <div style="margin-bottom: 20px;">
+        <span style="font-size: 20px; font-weight: 700; color: #111827; letter-spacing: -0.5px;">GuardFile</span>
       </div>
-      <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px; padding: 20px; text-align: center; margin-bottom: 20px;">
-        <h3 style="color: #166534; margin: 0 0 10px 0;">🎉 Access Approved by Administrator</h3>
-        <p style="color: #15803d; font-size: 14px; margin: 0 0 16px 0;">Hello ${userName || 'User'}, your account has been approved. Enter this Access Authorization Code to activate your dashboard:</p>
-        <div style="font-size: 30px; font-weight: 800; letter-spacing: 5px; color: #15803d; padding: 14px; background: #ffffff; border-radius: 8px; border: 2px dashed #86efac; display: inline-block;">
-          ${code}
-        </div>
-        <p style="color: #166534; font-size: 12px; margin-top: 14px;">Type this code into the pending verification screen on TrustVault.</p>
+      <p style="font-size: 15px; color: #15803d; margin-bottom: 8px; font-weight: 700;">
+        Account Approved
+      </p>
+      <p style="font-size: 14px; color: #374151; margin-bottom: 16px; line-height: 1.5;">
+        Hello ${userName || 'User'}, your account has been approved by the Administrator. Here is your Access Authorization Code:
+      </p>
+      <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 16px; text-align: center; margin-bottom: 16px;">
+        <span style="font-size: 28px; font-weight: 700; letter-spacing: 4px; color: #15803d; font-family: monospace;">${code}</span>
       </div>
-      <p style="color: #94a3b8; font-size: 12px; text-align: center; margin: 0;">
-        Security Notice: This code was personally authorized by your organization's TrustVault Administrator.
+      <p style="font-size: 13px; color: #6b7280; line-height: 1.5; margin-bottom: 0;">
+        Type this code into the GuardFile portal to unlock your dashboard.
       </p>
     </div>
   `;
 
   let delivered = false;
-  const emailText = `Hello ${userName || 'User'},\n\nYour account has been approved by the Administrator. Your Access Authorization Code is: ${code}\n\nPlease enter this code on the verification screen to activate your dashboard.`;
+  const emailText = `Hello ${userName || 'User'},\n\nYour account has been approved by the Administrator. Your Access Authorization Code is: ${code}\n\nEnter this code on the GuardFile portal to activate your account.`;
   try {
     const info = await transporter.sendMail({
-      from: `"TrustVault Security" <${smtpUser}>`,
+      from: `"GuardFile" <${smtpUser}>`,
       to: userEmail,
-      subject: `Your TrustVault Access Authorization Code: ${code}`,
+      subject: `Your GuardFile Access Authorization Code: ${code}`,
       text: emailText,
       html: emailHtml,
-      headers: {
-        'X-Priority': '1 (Highest)',
-        'X-MSMail-Priority': 'High',
-        'Importance': 'High',
-      },
     });
     console.log(`[Admin Code] Email dispatched to ${userEmail}: ${info.messageId}`);
     delivered = true;

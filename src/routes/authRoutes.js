@@ -325,11 +325,44 @@ router.post('/set-user-role', authenticateToken, async (req, res) => {
 });
 
 /**
+ * POST /api/auth/registration-status
+ * Real-time onboarding status check for pending users
+ */
+router.post('/registration-status', async (req, res) => {
+  const { userId, email } = req.body;
+  if (!userId && !email) {
+    return res.status(400).json({ error: 'userId or email is required' });
+  }
+  try {
+    const result = userId
+      ? await query('SELECT id, name, email, role, account_status, admin_auth_code FROM users WHERE id = $1', [userId])
+      : await query('SELECT id, name, email, role, account_status, admin_auth_code FROM users WHERE LOWER(email) = LOWER($1)', [email.trim()]);
+    if (!result.rows || result.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found.' });
+    }
+    const user = result.rows[0];
+    res.json({
+      success: true,
+      userId: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      account_status: user.account_status,
+      hasAdminCode: !!user.admin_auth_code,
+    });
+  } catch (err) {
+    console.error('[Registration Status Error]', err);
+    res.status(500).json({ error: 'Failed to check registration status.' });
+  }
+});
+
+/**
  * POST /api/auth/verify-admin-code
  * User enters the authorization code received from the admin to unlock dashboard.
  */
 router.post('/verify-admin-code', async (req, res) => {
-  const { userId, authCode } = req.body;
+  const userId = req.body.userId;
+  const authCode = req.body.authCode || req.body.code;
   const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
 
   if (!userId || !authCode) {
@@ -405,6 +438,12 @@ router.post('/verify-admin-code', async (req, res) => {
     console.error('[Verify Admin Code Error]', err);
     res.status(500).json({ error: 'Failed to verify authorization code.' });
   }
+});
+
+// Alias for frontend submit-admin-code
+router.post('/submit-admin-code', (req, res, next) => {
+  req.url = '/verify-admin-code';
+  router.handle(req, res, next);
 });
 
 /**

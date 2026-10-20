@@ -101,6 +101,8 @@ function clearSession() {
   currentUser = null;
   pendingRegistration = null;
   pending2FA = null;
+  stopAdminNotificationPolling();
+  stopUserApprovalPolling();
   renderAuthHeader();
   showAuthPortal();
   
@@ -202,9 +204,10 @@ function renderAuthHeader() {
   if (adminTab) {
     if (currentUser.role === 'admin') {
       adminTab.classList.remove('hidden');
-      loadPendingApprovalsCount();
+      startAdminNotificationPolling();
     } else {
       adminTab.classList.add('hidden');
+      stopAdminNotificationPolling();
     }
   }
 
@@ -216,8 +219,21 @@ function renderAuthHeader() {
     .substring(0, 2)
     .toUpperCase();
 
+  const adminNotificationHtml = (currentUser.role === 'admin') ? `
+    <button 
+      id="header-admin-notif-btn"
+      onclick="switchTab('approvals')" 
+      class="relative p-2 rounded-xl text-slate-700 bg-white hover:text-purple-700 hover:bg-purple-50 transition cursor-pointer flex items-center justify-center border border-slate-200 shadow-xs"
+      title="User Access Approvals Waiting"
+    >
+      <i data-lucide="bell" class="w-4 h-4 text-purple-600"></i>
+      <span id="header-admin-notif-badge" class="hidden absolute -top-1.5 -right-1.5 px-1.5 py-0.5 text-[9px] font-black rounded-full bg-rose-500 text-white animate-pulse">0</span>
+    </button>
+  ` : '';
+
   container.innerHTML = `
-    <div class="flex items-center gap-3">
+    <div class="flex items-center gap-2.5">
+      ${adminNotificationHtml}
       <div class="flex items-center gap-2 bg-slate-100/90 py-1 px-2.5 rounded-xl border border-slate-200">
         <div class="w-7 h-7 rounded-lg bg-blue-600 text-white font-bold flex items-center justify-center text-xs shadow-xs">
           ${initials}
@@ -292,9 +308,13 @@ function showPortalAuthTab(tab) {
   } else if (tab === 'otp') {
     if (tabHeader) { tabHeader.classList.add('hidden'); tabHeader.style.display = 'none'; }
     if (otpView) { otpView.classList.remove('hidden'); otpView.style.setProperty('display', 'flex', 'important'); }
+    stopUserApprovalPolling();
   } else if (tab === 'admin-code') {
     if (tabHeader) { tabHeader.classList.add('hidden'); tabHeader.style.display = 'none'; }
     if (adminCodeView) { adminCodeView.classList.remove('hidden'); adminCodeView.style.setProperty('display', 'flex', 'important'); }
+    startUserApprovalPolling();
+  } else {
+    stopUserApprovalPolling();
   }
 
   try {
@@ -798,6 +818,60 @@ async function triggerResendOtp() {
 // Backward-compatible alias
 const resendRegistrationOtp = triggerResendOtp;
 
+let userApprovalPollInterval = null;
+
+function startUserApprovalPolling() {
+  stopUserApprovalPolling();
+  userApprovalPollInterval = setInterval(async () => {
+    let target = pendingRegistration;
+    if (!target) {
+      try {
+        const stored = sessionStorage.getItem('trustvault_pending_reg');
+        if (stored) target = JSON.parse(stored);
+      } catch (e) {}
+    }
+    if (!target || (!target.userId && !target.email)) return;
+
+    try {
+      const res = await fetch('/api/auth/registration-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: target.userId, email: target.email }),
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+
+      if (data.account_status === 'AWAITING_USER_CODE' || data.hasAdminCode) {
+        stopUserApprovalPolling();
+        const noticeEl = document.getElementById('portal-admin-code-notice');
+        if (noticeEl) {
+          noticeEl.innerHTML = `
+            <span class="text-emerald-700 font-bold block mb-1">🎉 Authorization Code Dispatched!</span>
+            <span>The Administrator has approved your account and sent your code to <strong>${target.email}</strong>. Check your inbox (or spam) and enter it below.</span>
+          `;
+        }
+        const pillEl = document.getElementById('portal-admin-code-status-pill');
+        if (pillEl) {
+          pillEl.className = 'inline-block mt-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200';
+          pillEl.textContent = 'Code Sent to Your Email!';
+        }
+        showToast('Code Ready!', `The Administrator has dispatched your code to ${target.email}.`, 'success');
+        const codeInput = document.getElementById('portal-admin-code-input');
+        if (codeInput) {
+          codeInput.focus();
+        }
+      }
+    } catch (e) {}
+  }, 4000);
+}
+
+function stopUserApprovalPolling() {
+  if (userApprovalPollInterval) {
+    clearInterval(userApprovalPollInterval);
+    userApprovalPollInterval = null;
+  }
+}
+
 /**
  * Handle Portal Admin Code Submit
  */
@@ -812,8 +886,22 @@ async function handlePortalAdminCodeSubmit(e) {
 
   errorEl.classList.add('hidden');
 
-  if (!pendingRegistration) {
-    errorEl.textContent = 'Session state missing. Please sign in again.';
+  let target = pendingRegistration;
+  if (!target) {
+    try {
+      const stored = sessionStorage.getItem('trustvault_pending_reg');
+      if (stored) target = JSON.parse(stored);
+    } catch (e) {}
+  }
+
+  if (!target || !target.userId) {
+    errorEl.textContent = 'Registration session expired. Please sign in or register again.';
+    errorEl.classList.remove('hidden');
+    return false;
+  }
+
+  if (!code) {
+    errorEl.textContent = 'Please enter the authorization code sent to your email.';
     errorEl.classList.remove('hidden');
     return false;
   }
@@ -833,10 +921,10 @@ async function handlePortalAdminCodeSubmit(e) {
   }
 
   try {
-    const res = await fetch('/api/auth/submit-admin-code', {
+    const res = await fetch('/api/auth/verify-admin-code', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: pendingRegistration.userId, code }),
+      body: JSON.stringify({ userId: target.userId, authCode: code, code }),
     });
 
     const data = await res.json();
@@ -847,12 +935,14 @@ async function handlePortalAdminCodeSubmit(e) {
       return false;
     }
 
+    stopUserApprovalPolling();
+    try { sessionStorage.removeItem('trustvault_pending_reg'); } catch (e) {}
     setToken(data.token);
     currentUser = data.user;
     pendingRegistration = null;
     showDashboard();
     renderAuthHeader();
-    showToast('Vault Unlocked!', `Access granted. Welcome, ${currentUser.name}!`, 'success');
+    showToast('Vault Unlocked!', `Access granted. Welcome, ${currentUser.name} (${currentUser.role.toUpperCase()})!`, 'success');
     if (typeof loadDocuments === 'function') loadDocuments();
     if (typeof updateStats === 'function') updateStats();
   } catch (err) {
@@ -870,28 +960,47 @@ async function handlePortalAdminCodeSubmit(e) {
 /**
  * Check Admin Approval Status
  */
-async function checkAdminApprovalStatus() {
-  if (!pendingRegistration || !pendingRegistration.email) {
-    showToast('No User Session', 'Please sign in or register first.', 'error');
+async function checkAdminApprovalStatus(silent = false) {
+  let target = pendingRegistration;
+  if (!target) {
+    try {
+      const stored = sessionStorage.getItem('trustvault_pending_reg');
+      if (stored) target = JSON.parse(stored);
+    } catch (e) {}
+  }
+
+  if (!target || (!target.userId && !target.email)) {
+    if (!silent) showToast('No User Session', 'Please sign in or register first.', 'error');
     return;
   }
 
   try {
-    const res = await fetch('/api/auth/login', {
+    const res = await fetch('/api/auth/registration-status', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: pendingRegistration.email, password: 'check-status-probe' }),
+      body: JSON.stringify({ userId: target.userId, email: target.email }),
     });
 
     const data = await res.json();
 
-    if (data.account_status) {
-      handleAccountStatusResponse(data);
-      if (data.account_status === 'AWAITING_USER_CODE') {
-        showToast('Code Ready!', 'The Administrator has dispatched your code to your email.', 'success');
-      } else {
-        showToast('Status Checked', data.message || 'Still awaiting Administrator action.', 'info');
+    if (data.account_status === 'AWAITING_USER_CODE' || data.hasAdminCode) {
+      const noticeEl = document.getElementById('portal-admin-code-notice');
+      if (noticeEl) {
+        noticeEl.innerHTML = `
+          <span class="text-emerald-700 font-bold block mb-1">🎉 Authorization Code Dispatched!</span>
+          <span>The Administrator has approved your account and dispatched your code to <strong>${target.email}</strong>. Check your inbox and enter it below.</span>
+        `;
       }
+      const pillEl = document.getElementById('portal-admin-code-status-pill');
+      if (pillEl) {
+        pillEl.className = 'inline-block mt-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200';
+        pillEl.textContent = 'Code Sent to Your Email!';
+      }
+      if (!silent) showToast('Code Ready!', `The Administrator has dispatched your code to ${target.email}.`, 'success');
+      const codeInput = document.getElementById('portal-admin-code-input');
+      if (codeInput) codeInput.focus();
+    } else {
+      if (!silent) showToast('Status Checked', 'Still awaiting Administrator action.', 'info');
     }
   } catch (err) {
     console.error('Check status error:', err);
@@ -981,6 +1090,34 @@ function acceptTermsFromModal() {
   closeTermsModal();
 }
 
+let previousPendingCount = -1;
+let adminNotifPollInterval = null;
+
+function startAdminNotificationPolling() {
+  stopAdminNotificationPolling();
+  loadPendingApprovalsCount();
+  adminNotifPollInterval = setInterval(() => {
+    if (currentUser && currentUser.role === 'admin') {
+      loadPendingApprovalsCount();
+    }
+  }, 6000);
+}
+
+function stopAdminNotificationPolling() {
+  if (adminNotifPollInterval) {
+    clearInterval(adminNotifPollInterval);
+    adminNotifPollInterval = null;
+  }
+}
+
+function generateNewAdminCode(userId) {
+  const input = document.getElementById(`code-input-${userId}`);
+  if (input) {
+    input.value = `TV-${Math.floor(100000 + Math.random() * 900000)}`;
+    input.focus();
+  }
+}
+
 /**
  * Admin Panel: Load Pending Approvals Count & Table
  */
@@ -997,15 +1134,32 @@ async function loadPendingApprovalsCount() {
 
     const data = await res.json();
     const count = (data.pendingUsers || []).length;
+    
+    // Update tab badge
     const badge = document.getElementById('pending-badge');
     if (badge) {
       badge.textContent = count;
-      if (count > 0) {
-        badge.classList.remove('hidden');
-      } else {
-        badge.classList.add('hidden');
+      if (count > 0) badge.classList.remove('hidden');
+      else badge.classList.add('hidden');
+    }
+
+    // Update header notification bell badge
+    const headerBadge = document.getElementById('header-admin-notif-badge');
+    if (headerBadge) {
+      headerBadge.textContent = count;
+      if (count > 0) headerBadge.classList.remove('hidden');
+      else headerBadge.classList.add('hidden');
+    }
+
+    // Notify admin if new users just arrived
+    if (previousPendingCount !== -1 && count > previousPendingCount) {
+      showToast('New User Awaiting Approval!', `${count} user(s) verified OTP and are waiting for your Authorization Code.`, 'info');
+      const approvalsView = document.getElementById('view-approvals');
+      if (approvalsView && !approvalsView.classList.contains('hidden')) {
+        loadPendingApprovals();
       }
     }
+    previousPendingCount = count;
   } catch (err) {
     console.error('Failed to load pending approvals count:', err);
   }
@@ -1048,6 +1202,13 @@ async function loadPendingApprovals() {
       else badge.classList.add('hidden');
     }
 
+    const headerBadge = document.getElementById('header-admin-notif-badge');
+    if (headerBadge) {
+      headerBadge.textContent = users.length;
+      if (users.length > 0) headerBadge.classList.remove('hidden');
+      else headerBadge.classList.add('hidden');
+    }
+
     if (users.length === 0) {
       tbody.innerHTML = `
         <tr>
@@ -1072,23 +1233,23 @@ async function loadPendingApprovals() {
 
       return `
         <tr class="hover:bg-slate-50 transition">
-          <td class="py-3 px-4">
+          <td class="py-3.5 px-4">
             <div class="font-bold text-slate-900 font-sans text-xs">${u.name}</div>
             <div class="text-slate-500 text-[10px] font-mono">${u.email}</div>
           </td>
-          <td class="py-3 px-4 font-mono text-slate-700">${u.phone || 'N/A'}</td>
-          <td class="py-3 px-4">
+          <td class="py-3.5 px-4 font-mono text-slate-700">${u.phone || 'N/A'}</td>
+          <td class="py-3.5 px-4">
             <select
               id="role-select-${u.id}"
-              class="px-2 py-1 text-xs font-semibold rounded-lg border border-slate-200 bg-white text-slate-800 focus:ring-1 focus:ring-purple-500 cursor-pointer shadow-xs"
+              class="px-2.5 py-1 text-xs font-semibold rounded-lg border border-slate-200 bg-white text-slate-800 focus:ring-1 focus:ring-purple-500 cursor-pointer shadow-xs"
             >
               <option value="owner" ${u.role === 'owner' ? 'selected' : ''}>Document Owner</option>
               <option value="viewer" ${u.role === 'viewer' ? 'selected' : ''}>Document Viewer</option>
             </select>
           </td>
-          <td class="py-3 px-4">${statusBadge}</td>
-          <td class="py-3 px-4">
-            <div class="flex items-center gap-2">
+          <td class="py-3.5 px-4">${statusBadge}</td>
+          <td class="py-3.5 px-4">
+            <div class="flex items-center gap-1.5">
               <input
                 type="text"
                 id="code-input-${u.id}"
@@ -1097,6 +1258,15 @@ async function loadPendingApprovals() {
                 placeholder="TV-123456"
               />
               <button
+                type="button"
+                onclick="generateNewAdminCode('${u.id}')"
+                title="Generate fresh code"
+                class="p-1 rounded-lg text-slate-400 hover:text-purple-600 hover:bg-purple-50 transition cursor-pointer"
+              >
+                <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+              </button>
+              <button
+                id="dispatch-btn-${u.id}"
                 onclick="handleAdminDispatchCode('${u.id}', 'code-input-${u.id}', 'role-select-${u.id}')"
                 class="px-3 py-1 text-xs font-semibold text-white bg-purple-600 hover:bg-purple-700 rounded-lg shadow-xs flex items-center gap-1 transition cursor-pointer"
               >
@@ -1126,8 +1296,15 @@ async function handleAdminDispatchCode(userId, inputId, roleSelectId) {
 
   const codeInput = document.getElementById(inputId);
   const roleSelect = roleSelectId ? document.getElementById(roleSelectId) : null;
-  const customCode = codeInput ? codeInput.value : '';
+  const dispatchBtn = document.getElementById(`dispatch-btn-${userId}`);
+  const customCode = codeInput ? codeInput.value.trim() : '';
   const assignedRole = roleSelect ? roleSelect.value : undefined;
+
+  const origBtnHtml = dispatchBtn ? dispatchBtn.innerHTML : 'Send Code';
+  if (dispatchBtn) {
+    dispatchBtn.disabled = true;
+    dispatchBtn.innerHTML = `<span class="inline-flex items-center gap-1"><svg class="animate-spin h-3 w-3 text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg> Sending...</span>`;
+  }
 
   try {
     const res = await fetch('/api/auth/admin-dispatch-code', {
@@ -1143,11 +1320,24 @@ async function handleAdminDispatchCode(userId, inputId, roleSelectId) {
 
     if (!res.ok) {
       showToast('Dispatch Failed', data.error || 'Could not send code', 'error');
+      if (dispatchBtn) {
+        dispatchBtn.disabled = false;
+        dispatchBtn.innerHTML = origBtnHtml;
+      }
       return;
     }
 
     showToast('Code Dispatched!', data.message, 'success');
     loadPendingApprovals();
+    loadPendingApprovalsCount();
+  } catch (err) {
+    showToast('Error', err.message, 'error');
+    if (dispatchBtn) {
+      dispatchBtn.disabled = false;
+      dispatchBtn.innerHTML = origBtnHtml;
+    }
+  }
+}
   } catch (err) {
     showToast('Error', err.message, 'error');
   }

@@ -4,8 +4,11 @@ const { randomUUID: uuidv4 } = require('crypto');
 const { query } = require('../config/database');
 const { calculateAuditHash } = require('../utils/crypto');
 
+const isServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
 const GENESIS_HASH = '0000000000000000000000000000000000000000000000000000000000000000';
-const LEDGER_FILE = path.resolve(__dirname, '../../logs/audit_ledger.log');
+const LEDGER_FILE = isServerless
+  ? '/tmp/audit_ledger.log'
+  : path.resolve(__dirname, '../../logs/audit_ledger.log');
 
 // Ensure logs directory exists
 const logsDir = path.dirname(LEDGER_FILE);

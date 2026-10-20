@@ -39,6 +39,36 @@ app.use(cors());
 app.use(express.json({ limit: '15mb' }));
 app.use(express.urlencoded({ extended: true, limit: '15mb' }));
 
+// Ensure database is ready before processing requests (critical for serverless cold starts)
+let dbReadyPromise = null;
+async function ensureDbReady() {
+  if (!dbReadyPromise) {
+    dbReadyPromise = (async () => {
+      await migrate();
+      const usersRes = await query('SELECT count(*) as count FROM users');
+      const userCount = parseInt(usersRes.rows[0]?.count || 0, 10);
+      if (userCount === 0) {
+        console.log('[Init] No users found. Auto-seeding initial environment...');
+        await seed();
+      }
+    })();
+  }
+  return dbReadyPromise;
+}
+
+app.use(async (req, res, next) => {
+  // Let static assets pass through immediately if needed, or ensure DB for all
+  try {
+    if (req.path.startsWith('/api/')) {
+      await ensureDbReady();
+    }
+    next();
+  } catch (err) {
+    console.error('[DB Initialization Error]', err);
+    return res.status(500).json({ error: 'Database initialization failed', details: err.message });
+  }
+});
+
 // Anti-abuse rate limiting
 const apiLimiter = rateLimit({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000', 10), // 15 minutes
@@ -114,16 +144,7 @@ app.use((err, req, res, next) => {
  */
 async function startServer() {
   try {
-    // 1. Run migrations
-    await migrate();
-
-    // 2. Check if database needs seeding
-    const usersRes = await query('SELECT count(*) as count FROM users');
-    const userCount = parseInt(usersRes.rows[0]?.count || 0, 10);
-    if (userCount === 0) {
-      console.log('[Init] No users found. Auto-seeding initial environment...');
-      await seed();
-    }
+    await ensureDbReady();
 
     if (process.env.NODE_ENV !== 'test') {
       const server = app.listen(PORT, () => {
@@ -141,8 +162,12 @@ async function startServer() {
   }
 }
 
-if (process.env.NODE_ENV !== 'test') {
+// In serverless environments (e.g. Vercel), the platform wraps Express directly as a function;
+// only start standard listening if running as a persistent Node server.
+if (!process.env.VERCEL && !process.env.AWS_LAMBDA_FUNCTION_NAME && process.env.NODE_ENV !== 'test') {
   startServer();
 }
 
-module.exports = { app, startServer };
+module.exports = app;
+module.exports.app = app;
+module.exports.startServer = startServer;

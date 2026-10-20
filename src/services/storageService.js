@@ -4,7 +4,9 @@ const { randomUUID: uuidv4 } = require('crypto');
 const { hashBuffer } = require('../utils/crypto');
 
 // Root isolated directory outside the public web root
-const STORAGE_DIR = path.resolve(process.env.STORAGE_DIR || './secure_storage');
+const isServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+const defaultStorageDir = isServerless ? '/tmp/secure_storage' : './secure_storage';
+const STORAGE_DIR = path.resolve(process.env.STORAGE_DIR || defaultStorageDir);
 
 // Ensure secure storage directory exists with restricted permissions
 if (!fs.existsSync(STORAGE_DIR)) {

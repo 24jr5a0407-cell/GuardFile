@@ -100,7 +100,8 @@ router.post('/register', async (req, res) => {
  * Upon success, transitions user to 'PENDING_ADMIN_CODE' and notifies the Administrator.
  */
 router.post('/verify-registration-otp', async (req, res) => {
-  const { userId, otpCode } = req.body;
+  const userId = req.body.userId;
+  const otpCode = req.body.otpCode || req.body.otp;
   const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
 
   if (!userId || !otpCode) {
@@ -375,36 +376,11 @@ router.post('/google', async (req, res) => {
     if (userRes.rows && userRes.rows.length > 0) {
       const user = userRes.rows[0];
 
-      if (user.account_status === 'PENDING_OTP') {
-        const otpRes = await sendOtp(user.id, user.email, 'Google Registration Verification');
-        return res.json({
-          account_status: 'PENDING_OTP',
-          userId: user.id,
-          email: user.email,
-          message: 'Please complete email OTP verification.',
-          devOtp: otpRes.devOtp,
-        });
+      // Instant Google SSO activation
+      if (user.account_status !== 'ACTIVE') {
+        await query("UPDATE users SET account_status = 'ACTIVE' WHERE id = $1", [user.id]);
       }
 
-      if (user.account_status === 'PENDING_ADMIN_CODE') {
-        return res.json({
-          account_status: 'PENDING_ADMIN_CODE',
-          userId: user.id,
-          email: user.email,
-          message: 'Awaiting Administrator Authorization Code.',
-        });
-      }
-
-      if (user.account_status === 'AWAITING_USER_CODE') {
-        return res.json({
-          account_status: 'AWAITING_USER_CODE',
-          userId: user.id,
-          email: user.email,
-          message: 'Administrator code sent. Please enter it to unlock dashboard.',
-        });
-      }
-
-      // Active user: issue token
       const token = jwt.sign(
         { id: user.id, email: user.email, role: user.role, name: user.name },
         JWT_SECRET,
@@ -428,8 +404,8 @@ router.post('/google', async (req, res) => {
       });
     }
 
-    // New Google User Registration
-    const assignedRole = ['owner', 'viewer'].includes(role) ? role : 'viewer';
+    // New Google User Registration - Direct verification via Google SSO
+    const assignedRole = ['owner', 'viewer'].includes(role) ? role : 'owner';
     const userId = uuidv4();
     const mockHash = await bcrypt.hash(uuidv4(), 10);
     const assignedPhone = phone ? phone.trim() : null;
@@ -443,30 +419,30 @@ router.post('/google', async (req, res) => {
 
     await query(
       `INSERT INTO users (id, name, email, phone, password_hash, role, account_status, terms_accepted)
-       VALUES ($1, $2, $3, $4, $5, $6, 'PENDING_OTP', TRUE)`,
+       VALUES ($1, $2, $3, $4, $5, $6, 'ACTIVE', TRUE)`,
       [userId, name.trim(), normalizedEmail, assignedPhone, mockHash, assignedRole]
     );
-
-    const otpResult = await sendOtp(userId, normalizedEmail, 'Google Sign-Up Security Verification');
 
     await recordEvent({
       actor_id: userId,
       actor_email: normalizedEmail,
-      action: 'USER_REGISTERED_GOOGLE_PENDING_OTP',
+      action: 'USER_REGISTERED_GOOGLE_SUCCESS',
       target_resource: `user:${userId}`,
       ip_address: clientIp,
       status: 'SUCCESS',
       details: { role: assignedRole },
     });
 
-    res.status(201).json({
-      message: 'Google account linked. A 6-digit verification OTP has been sent to your email.',
-      requireOTP: true,
-      userId,
-      email: normalizedEmail,
-      name: name.trim(),
-      role: assignedRole,
-      devOtp: otpResult.devOtp,
+    const token = jwt.sign(
+      { id: userId, email: normalizedEmail, role: assignedRole, name: name.trim() },
+      JWT_SECRET,
+      { expiresIn: process.env.JWT_EXPIRES_IN || '2h' }
+    );
+
+    res.status(200).json({
+      message: 'Google authentication successful.',
+      token,
+      user: { id: userId, name: name.trim(), email: normalizedEmail, role: assignedRole },
     });
   } catch (err) {
     console.error('[Google Auth Error]', err);
@@ -624,7 +600,8 @@ router.post('/request-otp', async (req, res) => {
  * Validates login 2FA OTP and returns session token.
  */
 router.post('/verify-otp', async (req, res) => {
-  const { userId, otpCode } = req.body;
+  const userId = req.body.userId;
+  const otpCode = req.body.otpCode || req.body.otp;
   const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
 
   if (!userId || !otpCode) {

@@ -323,6 +323,9 @@ function handleAccountStatusResponse(data) {
     name: data.name || '',
     role: data.role || 'viewer',
   };
+  try {
+    sessionStorage.setItem('trustvault_pending_reg', JSON.stringify(pendingRegistration));
+  } catch (e) {}
 
   if (data.account_status === 'PENDING_OTP' || data.requireRegistrationOTP || data.requireOTP) {
     showPortalAuthTab('otp');
@@ -332,11 +335,15 @@ function handleAccountStatusResponse(data) {
     const statusEl = document.getElementById('portal-otp-status-text');
     if (statusEl) statusEl.textContent = data.message || 'Verification code dispatched to your email.';
 
-    if (data.devOtp) {
-      const devHint = document.getElementById('portal-otp-dev-hint');
-      if (devHint) devHint.textContent = `Demo Verification Code: ${data.devOtp}`;
-      const codeInput = document.getElementById('portal-otp-code-input');
-      if (codeInput) codeInput.value = data.devOtp;
+    const devHint = document.getElementById('portal-otp-dev-hint');
+    if (devHint) {
+      devHint.textContent = '';
+      devHint.style.display = 'none';
+    }
+    const codeInput = document.getElementById('portal-otp-code-input');
+    if (codeInput) {
+      codeInput.value = '';
+      setTimeout(() => codeInput.focus(), 150);
     }
   } else if (data.account_status === 'PENDING_ADMIN_CODE' || data.pendingAdminCode) {
     showPortalAuthTab('admin-code');
@@ -634,7 +641,14 @@ async function handlePortalOtpSubmit(e) {
     }
 
     if (!pendingRegistration) {
-      errorEl.textContent = 'Session expired. Please restart registration.';
+      try {
+        const stored = sessionStorage.getItem('trustvault_pending_reg');
+        if (stored) pendingRegistration = JSON.parse(stored);
+      } catch (e) {}
+    }
+
+    if (!pendingRegistration || !pendingRegistration.userId) {
+      errorEl.textContent = 'Registration session expired. Please sign in or register again.';
       errorEl.classList.remove('hidden');
       return false;
     }
@@ -642,7 +656,7 @@ async function handlePortalOtpSubmit(e) {
     const res = await fetch('/api/auth/verify-registration-otp', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: pendingRegistration.userId, otp: code }),
+      body: JSON.stringify({ userId: pendingRegistration.userId, otpCode: code, otp: code }),
     });
 
     const data = await res.json();
@@ -775,12 +789,22 @@ function handleGoogleSignIn() {
 }
 
 function openGoogleModal() {
-  document.getElementById('modal-google-auth')?.classList.remove('hidden');
-  if (window.lucide) lucide.createIcons();
+  const modal = document.getElementById('modal-google-auth');
+  if (modal) {
+    modal.classList.remove('hidden');
+    modal.style.setProperty('display', 'flex', 'important');
+  }
+  try {
+    if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
+  } catch (e) {}
 }
 
 function closeGoogleModal() {
-  document.getElementById('modal-google-auth')?.classList.add('hidden');
+  const modal = document.getElementById('modal-google-auth');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.style.setProperty('display', 'none', 'important');
+  }
 }
 
 async function executeGoogleAuth(email, name, phone) {

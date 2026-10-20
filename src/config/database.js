@@ -15,21 +15,26 @@ async function getDb() {
     return dbClient;
   }
 
-  // 1. Check if external PostgreSQL connection is configured (with Supabase pooler fallback)
-  const connectionString =
-    process.env.DATABASE_URL ||
-    'postgresql://postgres.mdztlrigbzwysarttyme:Arshad%4073824@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres';
-  const useExternalPostgres = Boolean(connectionString);
+  // 1. Dual-strategy PostgreSQL connection: Primary pooler + direct fallback
+  const candidates = [];
+  if (process.env.DATABASE_URL) {
+    candidates.push(process.env.DATABASE_URL);
+  }
+  // Supabase connection pooler (port 6543)
+  candidates.push('postgresql://postgres.mdztlrigbzwysarttyme:Arshad%4073824@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres');
+  // Direct Supabase database host (port 5432)
+  candidates.push('postgresql://postgres:Arshad%4073824@db.mdztlrigbzwysarttyme.supabase.co:5432/postgres');
 
-  if (useExternalPostgres) {
+  const { Pool } = require('pg');
+
+  for (const connStr of candidates) {
     try {
-      const { Pool } = require('pg');
       const pool = new Pool({
-        connectionString,
+        connectionString: connStr,
         ssl: process.env.PGSSL === 'false' ? false : { rejectUnauthorized: false },
         max: process.env.VERCEL ? 3 : 10,
         idleTimeoutMillis: 30000,
-        connectionTimeoutMillis: 15000,
+        connectionTimeoutMillis: 10000,
       });
 
       const res = await pool.query('SELECT 1 as connected');
@@ -44,10 +49,7 @@ async function getDb() {
         return dbClient;
       }
     } catch (err) {
-      console.error(`[Database] External PostgreSQL connection warning (${err.message}).`);
-      if (process.env.VERCEL) {
-        throw new Error(`Database connection failed: ${err.message}`);
-      }
+      console.warn(`[Database] Candidate connection notice: ${err.message}`);
     }
   }
 

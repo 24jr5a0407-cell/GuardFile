@@ -39,50 +39,31 @@ app.use(cors());
 app.use(express.json({ limit: '15mb' }));
 app.use(express.urlencoded({ extended: true, limit: '15mb' }));
 
-// Ensure database is ready before processing requests (critical for serverless cold starts)
+// Asynchronously ensure database readiness in the background
 let isDbReady = false;
-let dbReadyPromise = null;
-
 async function ensureDbReady() {
   if (isDbReady) return;
-
-  if (!dbReadyPromise) {
-    dbReadyPromise = (async () => {
-      try {
-        // Fast path: Check if database tables are already initialized
-        await query('SELECT id FROM users LIMIT 1');
-        isDbReady = true;
-      } catch (checkErr) {
-        console.log('[Init] Tables not detected. Migrating schema and seeding...', checkErr.message);
-        await migrate();
-        const usersRes = await query('SELECT count(*) as count FROM users');
-        const userCount = parseInt(usersRes.rows[0]?.count || 0, 10);
-        if (userCount === 0) {
-          console.log('[Init] No users found. Auto-seeding initial environment...');
-          await seed();
-        }
-        isDbReady = true;
-      }
-    })().catch((err) => {
-      dbReadyPromise = null; // Reset so subsequent requests can retry cleanly
-      throw err;
-    });
-  }
-  return dbReadyPromise;
-}
-
-app.use(async (req, res, next) => {
-  // Let static assets pass through immediately if needed, or ensure DB for all
   try {
-    if (req.path.startsWith('/api/')) {
-      await ensureDbReady();
-    }
-    next();
+    // Fast check: verify users table exists
+    await query('SELECT id FROM users LIMIT 1');
+    isDbReady = true;
   } catch (err) {
-    console.error('[DB Initialization Error]', err);
-    return res.status(500).json({ error: 'Database initialization failed: ' + (err.message || 'unknown error'), details: err.message });
+    try {
+      console.log('[DB Init] Initializing schema and seed data...');
+      await migrate();
+      const usersRes = await query('SELECT count(*) as count FROM users');
+      const userCount = parseInt(usersRes.rows[0]?.count || 0, 10);
+      if (userCount === 0) {
+        await seed();
+      }
+      isDbReady = true;
+    } catch (migErr) {
+      console.warn('[DB Init Notice]', migErr.message);
+    }
   }
-});
+}
+// Trigger background initialization on boot
+ensureDbReady().catch((e) => console.warn('[Background DB Check]', e.message));
 
 // Anti-abuse rate limiting
 const apiLimiter = rateLimit({

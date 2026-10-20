@@ -4,6 +4,7 @@
   "description": "TrustVault — Secure zero-trust document sharing platform with immutable audit trail (Snovasys Fresher Hiring Challenge 2026)",
   "main": "server.js",
   "scripts": {
+    "build": "echo 'Build ready'",
     "start": "node server.js",
     "dev": "node server.js",
     "db:migrate": "node src/db/migrate.js",

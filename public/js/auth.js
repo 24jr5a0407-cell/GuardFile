@@ -1659,7 +1659,6 @@ function renderUserDirectoryTable(users) {
         <td class="py-3.5 px-4 font-mono text-slate-700">${u.phone || '—'}</td>
         <td class="py-3.5 px-4">
           ${statusBadge}
-          ${assignedCodeHtml}
         </td>
         <td class="py-3.5 px-4">
           ${isAdmin ? `

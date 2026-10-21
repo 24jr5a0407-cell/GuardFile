@@ -150,4 +150,10 @@ describe('Zero-Trust Registration & Admin Authorization Flow', () => {
     const updated = (await query('SELECT account_status FROM users WHERE id = $1', [userRow.id])).rows[0];
     expect(updated.account_status).toBe('ACTIVE');
   });
+
+  afterAll(async () => {
+    try {
+      await query('DELETE FROM users WHERE email LIKE $1 OR email LIKE $2', ['%cyberdyne.org', '%trustvault.local']);
+    } catch (e) {}
+  });
 });

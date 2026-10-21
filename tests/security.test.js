@@ -150,4 +150,12 @@ describe('Zero-Trust Document Security & Authorization Enforcement', () => {
 
     expect(deleteAttempt.status).toBe(403);
   });
+
+  afterAll(async () => {
+    try {
+      await query('DELETE FROM document_permissions WHERE user_id IN ($1, $2, $3)', [SEED_IDS.alice, SEED_IDS.bob, SEED_IDS.charlie]);
+      await query('DELETE FROM documents WHERE owner_id IN ($1, $2, $3)', [SEED_IDS.alice, SEED_IDS.bob, SEED_IDS.charlie]);
+      await query('DELETE FROM users WHERE email LIKE $1', ['%trustvault.local']);
+    } catch (e) {}
+  });
 });

@@ -144,8 +144,9 @@ function renderDocuments(docs) {
 
           <div class="flex items-center gap-1">
             ${canManageGrants ? `
-              <button onclick="openPermissionsModal('${doc.id}', '${doc.title.replace(/'/g, "\\'")}')" class="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition cursor-pointer" title="Manage Permissions & Instant Revoke">
-                <i data-lucide="shield-check" class="w-4 h-4"></i>
+              <button onclick="openPermissionsModal('${doc.id}', '${doc.title.replace(/'/g, "\\'")}')" class="px-2.5 py-1.5 text-xs font-semibold text-purple-700 bg-purple-50 hover:bg-purple-100 rounded-xl transition cursor-pointer flex items-center gap-1 border border-purple-200/60" title="Send or share document access with users">
+                <i data-lucide="share-2" class="w-3.5 h-3.5 text-purple-600"></i>
+                <span>Send to User</span>
               </button>
             ` : ''}
 
@@ -531,8 +532,14 @@ window.handleImportSubmit = handleImportSubmit;
  */
 async function openPermissionsModal(docId, title) {
   currentPermDocId = docId;
-  document.getElementById('perm-modal-doc-title').textContent = `Document: ${title}`;
-  document.getElementById('modal-permissions')?.classList.remove('hidden');
+  const modal = document.getElementById('modal-permissions');
+  const titleEl = document.getElementById('perm-modal-doc-title');
+  if (titleEl) titleEl.textContent = `Document: ${title}`;
+  if (modal) {
+    modal.classList.remove('hidden');
+    modal.style.setProperty('display', 'flex', 'important');
+  }
+  if (window.lucide) lucide.createIcons();
 
   // Load all system users into the grant dropdown
   await loadUserDirectory();
@@ -541,7 +548,11 @@ async function openPermissionsModal(docId, title) {
 }
 
 function closePermissionsModal() {
-  document.getElementById('modal-permissions')?.classList.add('hidden');
+  const modal = document.getElementById('modal-permissions');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.style.setProperty('display', 'none', 'important');
+  }
   currentPermDocId = null;
 }
 

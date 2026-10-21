@@ -1,28 +1,61 @@
-// TrustVault Main Application Controller
+// GuardFile Main Application Controller
 
 function switchTab(tabName) {
-  // Hide all tab views
-  document.querySelectorAll('.tab-view').forEach(view => view.classList.add('hidden'));
-  document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active', 'bg-blue-50', 'text-blue-700', 'border-blue-200'));
+  console.log('[Tabs] Switching to tab:', tabName);
 
-  // Show active view
+  // Hide all tab views with both class and !important inline style
+  document.querySelectorAll('.tab-view').forEach(view => {
+    view.classList.add('hidden');
+    view.style.setProperty('display', 'none', 'important');
+  });
+
+  // Reset all tab button styles
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.classList.remove('active', 'bg-blue-50', 'text-blue-700', 'border-blue-200');
+    btn.classList.add('text-slate-600');
+  });
+
+  // Activate target view
   const targetView = document.getElementById(`view-${tabName}`);
   const targetBtn = document.getElementById(`tab-btn-${tabName}`);
 
-  if (targetView) targetView.classList.remove('hidden');
-  if (targetBtn) targetBtn.classList.add('active', 'bg-blue-50', 'text-blue-700', 'border-blue-200');
+  if (targetView) {
+    targetView.classList.remove('hidden');
+    targetView.style.setProperty('display', 'flex', 'important');
+  }
 
-  if (tabName === 'documents') {
-    loadDocuments();
-  } else if (tabName === 'audit') {
-    loadAuditLogs();
-  } else if (tabName === 'approvals') {
-    loadPendingApprovals();
-    if (typeof loadAllUsers === 'function') {
-      loadAllUsers();
+  if (targetBtn) {
+    targetBtn.classList.remove('text-slate-600');
+    targetBtn.classList.add('active', 'bg-blue-50', 'text-blue-700', 'border-blue-200');
+  }
+
+  try {
+    if (typeof lucide !== 'undefined' && lucide && typeof lucide.createIcons === 'function') {
+      lucide.createIcons();
     }
+  } catch (e) {}
+
+  // Trigger data loaders in safe try-catch blocks
+  try {
+    if (tabName === 'documents' && typeof loadDocuments === 'function') {
+      loadDocuments();
+    } else if (tabName === 'audit' && typeof loadAuditLogs === 'function') {
+      loadAuditLogs();
+    } else if (tabName === 'approvals') {
+      if (typeof loadPendingApprovals === 'function') {
+        loadPendingApprovals();
+      }
+      if (typeof loadAllUsers === 'function') {
+        loadAllUsers();
+      }
+    }
+  } catch (err) {
+    console.error('[Tabs] Error loading data for tab', tabName, err);
   }
 }
+
+// Explicitly register on window
+window.switchTab = switchTab;
 
 /**
  * Updates top metrics statistics.

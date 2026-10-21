@@ -1017,26 +1017,40 @@ function handleGoogleSignIn() {
 }
 
 function getGoogleAccounts() {
-  const defaults = [
+  const verifiedAccounts = [
     { email: '24jr5a0407@gmail.com', name: 'MD Arshad' },
-    { email: 'kiddocabspace@gmail.com', name: 'Arshad User' },
-    { email: 'guradfile@gmail.com', name: 'GuardFile Security' },
-    { email: 'sarah.connor@guardfile.io', name: 'Sarah Connor' },
+    { email: 'guardfile@gmail.com', name: 'GuardFile Security Admin' },
+    { email: 'kiddocabspace@gmail.com', name: 'Arshad' },
   ];
+
   try {
+    // Check localStorage for previously authenticated Google accounts
     const stored = localStorage.getItem('guardfile_google_accounts');
     if (stored) {
       const parsed = JSON.parse(stored);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        const emails = new Set(parsed.map(a => a.email.toLowerCase()));
-        defaults.forEach(d => {
-          if (!emails.has(d.email.toLowerCase())) parsed.push(d);
+      if (Array.isArray(parsed)) {
+        parsed.forEach(p => {
+          if (p && p.email && !verifiedAccounts.some(a => a.email.toLowerCase() === p.email.toLowerCase())) {
+            verifiedAccounts.push(p);
+          }
         });
-        return parsed;
       }
     }
+
+    // Check remembered email from login
+    const remembered = localStorage.getItem('trustvault_remembered_email');
+    if (remembered && !verifiedAccounts.some(a => a.email.toLowerCase() === remembered.toLowerCase())) {
+      verifiedAccounts.unshift({ email: remembered.toLowerCase(), name: remembered.split('@')[0] });
+    }
+
+    // Check last registered email
+    const lastReg = localStorage.getItem('guardfile_last_registered_email');
+    if (lastReg && !verifiedAccounts.some(a => a.email.toLowerCase() === lastReg.toLowerCase())) {
+      verifiedAccounts.unshift({ email: lastReg.toLowerCase(), name: lastReg.split('@')[0] });
+    }
   } catch (e) {}
-  return defaults;
+
+  return verifiedAccounts;
 }
 
 function renderGoogleAccountsList() {
@@ -1044,6 +1058,11 @@ function renderGoogleAccountsList() {
   if (!listEl) return;
   const accounts = getGoogleAccounts();
   const colors = ['bg-blue-600', 'bg-purple-600', 'bg-emerald-600', 'bg-amber-600', 'bg-indigo-600'];
+
+  if (accounts.length === 0) {
+    listEl.innerHTML = `<p class="text-xs text-slate-400 text-center py-3">No saved Google accounts yet.</p>`;
+    return;
+  }
 
   listEl.innerHTML = accounts.map((acc, idx) => {
     const displayName = acc.name || acc.email.split('@')[0];
@@ -1068,7 +1087,10 @@ function renderGoogleAccountsList() {
           <p class="text-xs font-bold text-slate-900 truncate">${displayName}</p>
           <p class="text-[11px] text-slate-500 truncate font-mono">${acc.email}</p>
         </div>
-        <i data-lucide="shield-check" class="w-4 h-4 text-blue-600 opacity-0 group-hover:opacity-100 transition shrink-0"></i>
+        <div class="flex items-center gap-1.5 shrink-0">
+          <span class="text-[10px] font-semibold text-blue-600 opacity-0 group-hover:opacity-100 transition">Sign In</span>
+          <i data-lucide="chevron-right" class="w-4 h-4 text-blue-600 opacity-0 group-hover:opacity-100 transition"></i>
+        </div>
       </button>
     `;
   }).join('');
@@ -1076,33 +1098,13 @@ function renderGoogleAccountsList() {
   if (window.lucide) lucide.createIcons();
 }
 
-function toggleGoogleCustomAccountForm(show) {
-  const form = document.getElementById('google-custom-account-form');
-  const btn = document.getElementById('btn-google-use-another');
-  const shouldShow = show !== undefined ? show : (form && form.classList.contains('hidden'));
-  if (form) {
-    if (shouldShow) {
-      form.classList.remove('hidden');
-      form.classList.add('flex');
-      if (btn) btn.classList.add('hidden');
-      const emailInput = document.getElementById('google-custom-email');
-      if (emailInput) setTimeout(() => emailInput.focus(), 100);
-    } else {
-      form.classList.add('hidden');
-      form.classList.remove('flex');
-      if (btn) btn.classList.remove('hidden');
-    }
-  }
-}
-
-function handleGoogleCustomAccountSubmit(e) {
+function handleGoogleDirectEmailSubmit(e) {
   if (e && e.preventDefault) e.preventDefault();
-  const emailInput = document.getElementById('google-custom-email');
-  const nameInput = document.getElementById('google-custom-name');
+  const emailInput = document.getElementById('google-direct-email-input');
   if (!emailInput || !emailInput.value.trim()) return;
 
   const email = emailInput.value.trim().toLowerCase();
-  const name = nameInput && nameInput.value.trim() ? nameInput.value.trim() : email.split('@')[0];
+  const name = email.split('@')[0];
 
   // Store in recent Google accounts for future one-click access
   try {
@@ -1120,7 +1122,11 @@ function openGoogleModal() {
   const modal = document.getElementById('modal-google-auth');
   if (modal) {
     renderGoogleAccountsList();
-    toggleGoogleCustomAccountForm(false);
+    const input = document.getElementById('google-direct-email-input');
+    if (input) {
+      input.value = '';
+      setTimeout(() => input.focus(), 150);
+    }
     modal.classList.remove('hidden');
     modal.style.setProperty('display', 'flex', 'important');
   }
@@ -1147,7 +1153,7 @@ async function executeGoogleAuth(email, name, phone) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         email: email.trim(),
-        name: name.trim(),
+        name: name ? name.trim() : email.split('@')[0],
         phone: phone ? phone.trim() : null,
         role: 'owner',
       }),
@@ -1169,7 +1175,7 @@ async function executeGoogleAuth(email, name, phone) {
     try {
       const accounts = getGoogleAccounts();
       if (!accounts.some(a => a.email.toLowerCase() === email.toLowerCase())) {
-        accounts.unshift({ email: email.toLowerCase(), name: name.trim() });
+        accounts.unshift({ email: email.toLowerCase(), name: (name || email.split('@')[0]).trim() });
         localStorage.setItem('guardfile_google_accounts', JSON.stringify(accounts.slice(0, 8)));
       }
     } catch (e) {}
@@ -1178,7 +1184,7 @@ async function executeGoogleAuth(email, name, phone) {
     currentUser = data.user;
     showDashboard();
     renderAuthHeader();
-    showToast('Google Authenticated', `Welcome, ${currentUser.name}! (Document Owner)`, 'success');
+    showToast('Google Authenticated', `Welcome, ${currentUser.name}!`, 'success');
     triggerDeviceNotification('Welcome to GuardFile!', `Authenticated via Google as ${currentUser.name}.`);
     if (typeof loadDocuments === 'function') loadDocuments();
     if (typeof updateStats === 'function') updateStats();
@@ -1186,6 +1192,15 @@ async function executeGoogleAuth(email, name, phone) {
     showToast('Google Sign-In Error', err.message, 'error');
   }
 }
+
+// Attach Google auth functions globally to window
+window.handleGoogleSignIn = handleGoogleSignIn;
+window.openGoogleModal = openGoogleModal;
+window.closeGoogleModal = closeGoogleModal;
+window.executeGoogleAuth = executeGoogleAuth;
+window.handleGoogleDirectEmailSubmit = handleGoogleDirectEmailSubmit;
+window.loadPendingApprovals = loadPendingApprovals;
+window.loadAllUsers = loadAllUsers;
 
 /**
  * Web Audio Chime Notification Helper

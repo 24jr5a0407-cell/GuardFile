@@ -492,75 +492,75 @@
   <!-- Main Dashboard Container (Visible ONLY when authenticated) -->
   <div id="main-dashboard-container" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full flex flex-col gap-6 hidden">
 
-    <!-- Subheader Navigation Tabs -->
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
-      <nav class="flex space-x-2" aria-label="Tabs">
-        <button onclick="switchTab('documents')" id="tab-btn-documents" class="tab-btn active px-4 py-2 text-sm font-semibold rounded-xl bg-blue-50 text-blue-700 border border-blue-200 flex items-center gap-2">
+    <!-- Subheader Navigation Tabs (Apple HIG Segmented Controller) -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200/60 pb-4">
+      <nav class="ios-nav-pill-bar" aria-label="Tabs">
+        <button onclick="switchTab('documents')" id="tab-btn-documents" class="tab-btn ios-nav-pill active">
           <i data-lucide="files" class="w-4 h-4"></i> Secured Documents
         </button>
-        <button onclick="switchTab('audit')" id="tab-btn-audit" class="tab-btn px-4 py-2 text-sm font-semibold rounded-xl text-slate-600 hover:bg-slate-100 flex items-center gap-2">
+        <button onclick="switchTab('audit')" id="tab-btn-audit" class="tab-btn ios-nav-pill">
           <i data-lucide="history" class="w-4 h-4"></i> Security Audit Trail
         </button>
-        <button onclick="switchTab('approvals')" id="tab-btn-approvals" class="tab-btn hidden px-4 py-2 text-sm font-semibold rounded-xl text-slate-600 hover:bg-slate-100 flex items-center gap-2">
+        <button onclick="switchTab('approvals')" id="tab-btn-approvals" class="tab-btn ios-nav-pill hidden">
           <i data-lucide="user-check" class="w-4 h-4 text-purple-600"></i> User Access Approvals
-          <span id="pending-badge" class="hidden px-2 py-0.5 text-[10px] font-extrabold rounded-full bg-rose-500 text-white">0</span>
+          <span id="pending-badge" class="hidden px-2 py-0.5 text-[10px] font-extrabold rounded-full bg-rose-500 text-white shadow-xs">0</span>
         </button>
       </nav>
 
       <div class="flex items-center gap-2">
-        <button onclick="verifyCryptographicChain()" class="px-3.5 py-2 text-xs font-semibold rounded-2xl bg-emerald-50 text-emerald-700 border border-emerald-200/80 hover:bg-emerald-100 flex items-center gap-1.5 transition cursor-pointer shadow-xs">
-          <i data-lucide="check-circle" class="w-4 h-4 text-emerald-600"></i>
+        <button onclick="verifyCryptographicChain()" class="ios-btn-tinted-emerald px-3.5 py-2 text-xs font-bold rounded-2xl flex items-center gap-1.5 transition cursor-pointer shadow-xs">
+          <i data-lucide="check-circle" class="w-4 h-4"></i>
           Verify Ledger Chain
         </button>
-        <button id="btn-open-import" onclick="openImportModal()" class="px-3.5 py-2 text-xs font-semibold rounded-2xl bg-purple-50 text-purple-700 border border-purple-200/80 hover:bg-purple-100 flex items-center gap-1.5 transition cursor-pointer shadow-xs">
-          <i data-lucide="folder-input" class="w-4 h-4 text-purple-600"></i>
+        <button id="btn-open-import" onclick="openImportModal()" class="ios-btn-tinted-purple px-3.5 py-2 text-xs font-bold rounded-2xl flex items-center gap-1.5 transition cursor-pointer shadow-xs">
+          <i data-lucide="folder-input" class="w-4 h-4"></i>
           Import Files
         </button>
-        <button id="btn-open-upload" onclick="openUploadModal()" class="px-4 py-2 text-xs font-semibold rounded-2xl bg-blue-600 text-white hover:bg-blue-700 shadow-sm flex items-center gap-1.5 transition cursor-pointer">
+        <button id="btn-open-upload" onclick="openUploadModal()" class="ios-btn-primary px-4 py-2 text-xs font-bold rounded-2xl shadow-sm flex items-center gap-1.5 transition cursor-pointer">
           <i data-lucide="plus" class="w-4 h-4"></i> New Document
         </button>
       </div>
     </div>
 
-    <!-- Live Metrics Overview Cards -->
+    <!-- Live Metrics Overview Cards (Apple HIG continuous squircle gradients) -->
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4" id="stats-container">
-      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-4">
-        <div class="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600">
+      <div class="ios-card p-4 flex items-center gap-3.5">
+        <div class="w-12 h-12 rounded-2xl ios-tile-blue flex items-center justify-center text-white shrink-0">
           <i data-lucide="file-lock" class="w-6 h-6"></i>
         </div>
         <div>
-          <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Total Documents</p>
-          <h3 class="text-2xl font-extrabold text-slate-900" id="stat-total-docs">-</h3>
+          <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Documents</p>
+          <h3 class="text-2xl font-black text-slate-900 tracking-tight" id="stat-total-docs">-</h3>
         </div>
       </div>
 
-      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-4">
-        <div class="w-12 h-12 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600">
+      <div class="ios-card p-4 flex items-center gap-3.5">
+        <div class="w-12 h-12 rounded-2xl ios-tile-emerald flex items-center justify-center text-white shrink-0">
           <i data-lucide="key" class="w-6 h-6"></i>
         </div>
         <div>
-          <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Active Grants</p>
-          <h3 class="text-2xl font-extrabold text-emerald-600" id="stat-active-grants">-</h3>
+          <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Active Grants</p>
+          <h3 class="text-2xl font-black text-emerald-600 tracking-tight" id="stat-active-grants">-</h3>
         </div>
       </div>
 
-      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-4">
-        <div class="w-12 h-12 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600">
+      <div class="ios-card p-4 flex items-center gap-3.5">
+        <div class="w-12 h-12 rounded-2xl ios-tile-amber flex items-center justify-center text-white shrink-0">
           <i data-lucide="lock" class="w-6 h-6"></i>
         </div>
         <div>
-          <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Instant Revocations</p>
-          <h3 class="text-2xl font-extrabold text-amber-600" id="stat-revoked-grants">-</h3>
+          <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Instant Revokes</p>
+          <h3 class="text-2xl font-black text-amber-600 tracking-tight" id="stat-revoked-grants">-</h3>
         </div>
       </div>
 
-      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-4">
-        <div class="w-12 h-12 rounded-xl bg-rose-50 flex items-center justify-center text-rose-600">
+      <div class="ios-card p-4 flex items-center gap-3.5">
+        <div class="w-12 h-12 rounded-2xl ios-tile-rose flex items-center justify-center text-white shrink-0">
           <i data-lucide="shield-x" class="w-6 h-6"></i>
         </div>
         <div>
-          <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Refused Attempts</p>
-          <h3 class="text-2xl font-extrabold text-rose-600" id="stat-denied-attempts">-</h3>
+          <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Refused Attempts</p>
+          <h3 class="text-2xl font-black text-rose-600 tracking-tight" id="stat-denied-attempts">-</h3>
         </div>
       </div>
     </div>

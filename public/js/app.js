@@ -12,7 +12,6 @@ function switchTab(tabName) {
   // Reset all tab button styles
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.classList.remove('active', 'bg-blue-50', 'text-blue-700', 'border-blue-200');
-    btn.classList.add('text-slate-600');
   });
 
   // Activate target view
@@ -25,8 +24,7 @@ function switchTab(tabName) {
   }
 
   if (targetBtn) {
-    targetBtn.classList.remove('text-slate-600');
-    targetBtn.classList.add('active', 'bg-blue-50', 'text-blue-700', 'border-blue-200');
+    targetBtn.classList.add('active');
   }
 
   try {

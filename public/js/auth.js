@@ -241,7 +241,7 @@ function renderAuthHeader() {
     <div class="flex items-center gap-2">
       ${notifBellHtml}
 
-      <div class="flex items-center gap-2.5 bg-slate-100/90 py-1 px-3 rounded-2xl border border-slate-200/80 shadow-xs">
+      <div class="flex items-center gap-2.5 bg-white/85 backdrop-blur-md py-1.5 px-3 rounded-2xl border border-slate-200/80 shadow-xs">
         <div class="w-7 h-7 rounded-xl ${isAdmin ? 'ios-badge-purple' : 'ios-badge-blue'} text-white font-bold flex items-center justify-center text-xs shadow-xs">
           ${initials}
         </div>
@@ -257,9 +257,9 @@ function renderAuthHeader() {
         </span>
       </div>
 
-      <button onclick="openLogoutModal()" class="px-3 py-1.5 text-xs font-semibold text-slate-600 hover:text-rose-600 hover:bg-rose-50 rounded-2xl transition cursor-pointer flex items-center gap-1.5 border border-transparent hover:border-rose-200" title="Sign Out">
-        <i data-lucide="log-out" class="w-4 h-4"></i>
-        <span class="hidden sm:inline">Sign Out</span>
+      <button type="button" id="header-logout-btn" onclick="openLogoutModal()" class="px-3 py-1.5 text-xs font-semibold text-rose-600 bg-rose-50/70 hover:bg-rose-100/90 rounded-2xl transition cursor-pointer flex items-center gap-1.5 border border-rose-200/60 shadow-xs active:scale-95" title="Sign Out">
+        <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
+        <span class="hidden sm:inline font-bold">Sign Out</span>
       </button>
     </div>
   `;

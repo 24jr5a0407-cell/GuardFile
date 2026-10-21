@@ -179,7 +179,7 @@ async function quickLogin(email, password) {
 }
 
 /**
- * Renders Top Header Session View
+ * Renders Top Header Session View (iOS Human Interface Design)
  */
 function renderAuthHeader() {
   const container = document.getElementById('auth-header-container');
@@ -187,23 +187,19 @@ function renderAuthHeader() {
 
   if (!currentUser) {
     container.innerHTML = `
-      <button onclick="showPortalAuthTab('login'); window.scrollTo({top: 0, behavior: 'smooth'});" class="px-4 py-2 text-xs font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 shadow-sm transition cursor-pointer">
+      <button onclick="showPortalAuthTab('login'); window.scrollTo({top: 0, behavior: 'smooth'});" class="px-4 py-2 text-xs font-bold text-white bg-blue-600 rounded-2xl hover:bg-blue-700 shadow-sm transition cursor-pointer">
         Sign In
       </button>
     `;
     return;
   }
 
-  const roleBadgeColor = {
-    admin: 'bg-purple-100 text-purple-800 border-purple-200',
-    owner: 'bg-blue-100 text-blue-800 border-blue-200',
-    viewer: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-  }[currentUser.role] || 'bg-slate-100 text-slate-800 border-slate-200';
+  const isAdmin = currentUser.role === 'admin';
 
   // Toggle Admin Approvals Tab in Dashboard
   const adminTab = document.getElementById('tab-btn-approvals');
   if (adminTab) {
-    if (currentUser.role === 'admin') {
+    if (isAdmin) {
       adminTab.classList.remove('hidden');
       startAdminNotificationPolling();
     } else {
@@ -220,48 +216,72 @@ function renderAuthHeader() {
     .substring(0, 2)
     .toUpperCase();
 
-  const adminNotificationHtml = (currentUser.role === 'admin') ? `
+  // Mask admin identity on header for zero-trust executive stealth
+  const displayEmail = isAdmin ? 'g***e@gmail.com' : currentUser.email;
+  const displayName = isAdmin ? 'Master Administrator' : currentUser.name;
+  const roleBadgeText = isAdmin ? 'Admin' : (currentUser.role === 'owner' ? 'Owner' : 'Viewer');
+  const roleBadgeStyle = isAdmin 
+    ? 'bg-purple-100 text-purple-800 border-purple-200' 
+    : (currentUser.role === 'owner' ? 'bg-blue-100 text-blue-800 border-blue-200' : 'bg-emerald-100 text-emerald-800 border-emerald-200');
+
+  // Unified Notification Bell
+  const notifBellHtml = `
     <button 
-      id="header-admin-notif-btn"
-      onclick="switchTab('approvals')" 
-      class="relative p-2 rounded-xl text-slate-700 bg-white hover:text-purple-700 hover:bg-purple-50 transition cursor-pointer flex items-center justify-center border border-slate-200 shadow-xs"
-      title="User Access Approvals Waiting"
+      id="header-unified-notif-btn"
+      onclick="handleUnifiedNotifClick()" 
+      class="relative p-2 rounded-2xl text-slate-700 bg-white/90 hover:text-purple-700 hover:bg-purple-50 transition cursor-pointer flex items-center justify-center border border-slate-200/80 shadow-xs"
+      title="Notifications & Security Alerts"
     >
       <i data-lucide="bell" class="w-4 h-4 text-purple-600"></i>
       <span id="header-admin-notif-badge" class="hidden absolute -top-1.5 -right-1.5 px-1.5 py-0.5 text-[9px] font-black rounded-full bg-rose-500 text-white animate-pulse">0</span>
     </button>
-  ` : '';
+  `;
 
   container.innerHTML = `
-    <div class="flex items-center gap-2.5">
-      ${adminNotificationHtml}
-      <div class="flex items-center gap-2 bg-slate-100/90 py-1 px-2.5 rounded-xl border border-slate-200">
-        <div class="w-7 h-7 rounded-lg bg-blue-600 text-white font-bold flex items-center justify-center text-xs shadow-xs">
+    <div class="flex items-center gap-2">
+      ${notifBellHtml}
+
+      <div class="flex items-center gap-2.5 bg-slate-100/90 py-1 px-3 rounded-2xl border border-slate-200/80 shadow-xs">
+        <div class="w-7 h-7 rounded-xl ${isAdmin ? 'ios-badge-purple' : 'ios-badge-blue'} text-white font-bold flex items-center justify-center text-xs shadow-xs">
           ${initials}
         </div>
         <div class="flex flex-col text-left">
-          <span class="text-xs font-bold text-slate-900 leading-tight">${currentUser.name}</span>
-          <span class="text-[10px] text-slate-500 font-mono leading-tight">${currentUser.email}</span>
+          <span class="text-xs font-bold text-slate-900 leading-tight flex items-center gap-1">
+            ${displayName}
+            ${isAdmin ? '<i data-lucide="shield" class="w-3 h-3 text-purple-600"></i>' : ''}
+          </span>
+          <span class="text-[10px] text-slate-500 font-mono leading-tight">${displayEmail}</span>
         </div>
-        <span class="ml-1 text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full border ${roleBadgeColor}">
-          ${currentUser.role}
+        <span class="ml-1 text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full border ${roleBadgeStyle}">
+          ${roleBadgeText}
         </span>
       </div>
 
-      <button onclick="clearSession()" class="px-3 py-1.5 text-xs font-semibold text-slate-600 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition cursor-pointer flex items-center gap-1.5" title="Sign Out">
+      <button onclick="openLogoutModal()" class="px-3 py-1.5 text-xs font-semibold text-slate-600 hover:text-rose-600 hover:bg-rose-50 rounded-2xl transition cursor-pointer flex items-center gap-1.5 border border-transparent hover:border-rose-200" title="Sign Out">
         <i data-lucide="log-out" class="w-4 h-4"></i>
         <span class="hidden sm:inline">Sign Out</span>
       </button>
     </div>
   `;
 
-  // Hide upload button if Viewer
+  // Hide upload and import buttons if Viewer
   const uploadBtn = document.getElementById('btn-open-upload');
-  if (uploadBtn) {
-    uploadBtn.style.display = (currentUser.role === 'viewer') ? 'none' : 'flex';
-  }
+  const importBtn = document.getElementById('btn-open-import');
+  const isViewer = currentUser.role === 'viewer';
+  if (uploadBtn) uploadBtn.style.display = isViewer ? 'none' : 'flex';
+  if (importBtn) importBtn.style.display = isViewer ? 'none' : 'flex';
 
   if (window.lucide) lucide.createIcons();
+}
+
+/**
+ * Unified notification click handler
+ */
+function handleUnifiedNotifClick() {
+  if (currentUser?.role === 'admin') {
+    switchTab('approvals');
+  }
+  toggleDesktopNotifications();
 }
 
 /**
@@ -1403,6 +1423,8 @@ async function loadPendingApprovalsCount() {
   }
 }
 
+let _cachedPendingUsers = [];
+
 async function loadPendingApprovals() {
   const token = getToken();
   if (!token || !currentUser || currentUser.role !== 'admin') return;
@@ -1412,7 +1434,7 @@ async function loadPendingApprovals() {
 
   tbody.innerHTML = `
     <tr>
-      <td colspan="5" class="py-12 text-center text-slate-400">
+      <td colspan="5" class="py-12 text-center text-slate-400 font-sans">
         <i data-lucide="loader" class="w-6 h-6 animate-spin mx-auto mb-2 text-purple-600"></i>
         Loading pending authorizations...
       </td>
@@ -1426,159 +1448,128 @@ async function loadPendingApprovals() {
     });
 
     if (!res.ok) {
-      tbody.innerHTML = `<tr><td colspan="5" class="py-6 text-center text-rose-500">Failed to load pending users.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="5" class="py-6 text-center text-rose-500 font-sans">Failed to load pending users.</td></tr>`;
       return;
     }
 
     const data = await res.json();
-    const users = data.pendingUsers || [];
+    _cachedPendingUsers = data.pendingUsers || [];
 
     const badge = document.getElementById('pending-badge');
     if (badge) {
-      badge.textContent = users.length;
-      if (users.length > 0) badge.classList.remove('hidden');
+      badge.textContent = _cachedPendingUsers.length;
+      if (_cachedPendingUsers.length > 0) badge.classList.remove('hidden');
       else badge.classList.add('hidden');
     }
 
     const headerBadge = document.getElementById('header-admin-notif-badge');
     if (headerBadge) {
-      headerBadge.textContent = users.length;
-      if (users.length > 0) headerBadge.classList.remove('hidden');
+      headerBadge.textContent = _cachedPendingUsers.length;
+      if (_cachedPendingUsers.length > 0) headerBadge.classList.remove('hidden');
       else headerBadge.classList.add('hidden');
     }
 
-    if (users.length === 0) {
-      tbody.innerHTML = `
-        <tr>
-          <td colspan="5" class="py-12 text-center text-slate-400">
-            <i data-lucide="check-circle" class="w-8 h-8 text-emerald-500 mx-auto mb-2"></i>
-            <p class="font-semibold text-slate-700">All users authorized</p>
-            <p class="text-xs text-slate-400 mt-1">There are no pending accounts awaiting security approval.</p>
-          </td>
-        </tr>
-      `;
-      if (window.lucide) lucide.createIcons();
-      return;
-    }
+    renderApprovalsTable(_cachedPendingUsers);
+  } catch (err) {
+    console.error('Error loading pending approvals:', err);
+    tbody.innerHTML = `<tr><td colspan="5" class="py-6 text-center text-rose-500 font-sans">Error: ${err.message}</td></tr>`;
+  }
+}
 
-    tbody.innerHTML = users.map(u => {
-      const isDispatched = u.account_status === 'AWAITING_USER_CODE';
-      const statusBadge = isDispatched
-        ? '<span class="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 border border-blue-200 font-bold">CODE DISPATCHED</span>'
-        : '<span class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200 font-bold animate-pulse">PENDING ADMIN CODE</span>';
+function renderApprovalsTable(users) {
+  const tbody = document.getElementById('approvals-table-body');
+  if (!tbody) return;
 
-      const defaultCode = u.admin_auth_code || `TV-${Math.floor(100000 + Math.random() * 900000)}`;
+  if (users.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="5" class="py-12 text-center text-slate-400 font-sans">
+          <i data-lucide="check-circle" class="w-8 h-8 text-emerald-500 mx-auto mb-2"></i>
+          <p class="font-semibold text-slate-700">All users authorized</p>
+          <p class="text-xs text-slate-400 mt-1">There are no pending accounts awaiting security approval.</p>
+        </td>
+      </tr>
+    `;
+    if (window.lucide) lucide.createIcons();
+    return;
+  }
 
-      return `
-        <tr class="hover:bg-slate-50 transition">
-          <td class="py-3.5 px-4">
-            <div class="font-bold text-slate-900 font-sans text-xs">${u.name}</div>
-            <div class="text-slate-500 text-[10px] font-mono">${u.email}</div>
-          </td>
-          <td class="py-3.5 px-4 font-mono text-slate-700">${u.phone || 'N/A'}</td>
-          <td class="py-3.5 px-4">
-            <select
-              id="role-select-${u.id}"
-              class="px-2.5 py-1 text-xs font-semibold rounded-lg border border-slate-200 bg-white text-slate-800 focus:ring-1 focus:ring-purple-500 cursor-pointer shadow-xs"
+  tbody.innerHTML = users.map(u => {
+    const isDispatched = u.account_status === 'AWAITING_USER_CODE';
+    const statusBadge = isDispatched
+      ? '<span class="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 border border-blue-200 font-bold">CODE DISPATCHED</span>'
+      : '<span class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200 font-bold animate-pulse">PENDING ADMIN CODE</span>';
+
+    const defaultCode = u.admin_auth_code || `GF-${Math.floor(100000 + Math.random() * 900000)}`;
+
+    return `
+      <tr class="hover:bg-slate-50 transition">
+        <td class="py-3.5 px-4">
+          <div class="font-bold text-slate-900 font-sans text-xs">${u.name}</div>
+          <div class="text-slate-500 text-[10px] font-mono">${u.email}</div>
+        </td>
+        <td class="py-3.5 px-4 font-mono text-slate-700">${u.phone || 'N/A'}</td>
+        <td class="py-3.5 px-4">
+          <select
+            id="role-select-${u.id}"
+            class="px-2.5 py-1 text-xs font-semibold rounded-lg border border-slate-200 bg-white text-slate-800 focus:ring-1 focus:ring-purple-500 cursor-pointer shadow-xs"
+          >
+            <option value="owner" ${u.role === 'owner' ? 'selected' : ''}>Document Owner</option>
+            <option value="viewer" ${u.role === 'viewer' ? 'selected' : ''}>Document Viewer</option>
+          </select>
+        </td>
+        <td class="py-3.5 px-4">${statusBadge}</td>
+        <td class="py-3.5 px-4">
+          <div class="flex items-center gap-1.5">
+            <input
+              type="text"
+              id="code-input-${u.id}"
+              value="${defaultCode}"
+              class="w-32 px-2.5 py-1 text-xs font-mono font-bold uppercase tracking-wider bg-slate-50 border border-slate-300 rounded-lg text-slate-800 focus:bg-white focus:ring-1 focus:ring-purple-500"
+              placeholder="GF-123456"
+            />
+            <button
+              type="button"
+              onclick="generateNewAdminCode('${u.id}')"
+              title="Generate fresh code"
+              class="p-1 rounded-lg text-slate-400 hover:text-purple-600 hover:bg-purple-50 transition cursor-pointer"
             >
-              <option value="owner" ${u.role === 'owner' ? 'selected' : ''}>Document Owner</option>
-              <option value="viewer" ${u.role === 'viewer' ? 'selected' : ''}>Document Viewer</option>
-            </select>
-          </td>
-          <td class="py-3.5 px-4">${statusBadge}</td>
-          <td class="py-3.5 px-4">
-            <div class="flex items-center gap-1.5">
-              <input
-                type="text"
-                id="code-input-${u.id}"
-                value="${defaultCode}"
-                class="w-32 px-2.5 py-1 text-xs font-mono font-bold uppercase tracking-wider bg-slate-50 border border-slate-300 rounded-lg text-slate-800 focus:bg-white focus:ring-1 focus:ring-purple-500"
-                placeholder="TV-123456"
-              />
-              <button
-                type="button"
-                onclick="generateNewAdminCode('${u.id}')"
-                title="Generate fresh code"
-                class="p-1 rounded-lg text-slate-400 hover:text-purple-600 hover:bg-purple-50 transition cursor-pointer"
-              >
-                <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
-              </button>
-              <button
-                id="dispatch-btn-${u.id}"
-                onclick="handleAdminDispatchCode('${u.id}', 'code-input-${u.id}', 'role-select-${u.id}')"
-                class="px-3 py-1 text-xs font-semibold text-white bg-purple-600 hover:bg-purple-700 rounded-lg shadow-xs flex items-center gap-1 transition cursor-pointer"
-              >
-                <i data-lucide="send" class="w-3 h-3"></i> Send Code
-              </button>
-            </div>
-          </td>
-        </tr>
-      `;
-    }).join('');
+              <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+            </button>
+            <button
+              id="dispatch-btn-${u.id}"
+              onclick="handleAdminDispatchCode('${u.id}', 'code-input-${u.id}', 'role-select-${u.id}')"
+              class="px-3 py-1 text-xs font-semibold text-white bg-purple-600 hover:bg-purple-700 rounded-lg shadow-xs flex items-center gap-1 transition cursor-pointer"
+            >
+              <i data-lucide="send" class="w-3 h-3"></i> Send Code
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
 
-    try {
-      if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
-    } catch (e) {}
-  } catch (err) {
-    console.error('Error rendering approvals:', err);
-    tbody.innerHTML = `<tr><td colspan="5" class="py-6 text-center text-rose-500">Error: ${err.message}</td></tr>`;
-  }
+  if (window.lucide) lucide.createIcons();
 }
 
-/**
- * Administrator Dispatches Authorization Code to User's Email and Assigns Role
- */
-async function handleAdminDispatchCode(userId, inputId, roleSelectId) {
-  const token = getToken();
-  if (!token) return;
-
-  const codeInput = document.getElementById(inputId);
-  const roleSelect = roleSelectId ? document.getElementById(roleSelectId) : null;
-  const dispatchBtn = document.getElementById(`dispatch-btn-${userId}`);
-  const customCode = codeInput ? codeInput.value.trim() : '';
-  const assignedRole = roleSelect ? roleSelect.value : undefined;
-
-  const origBtnHtml = dispatchBtn ? dispatchBtn.innerHTML : 'Send Code';
-  if (dispatchBtn) {
-    dispatchBtn.disabled = true;
-    dispatchBtn.innerHTML = `<span class="inline-flex items-center gap-1"><svg class="animate-spin h-3 w-3 text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg> Sending...</span>`;
+function handleApprovalsSearch(query) {
+  const q = (query || '').toLowerCase().trim();
+  if (!q) {
+    renderApprovalsTable(_cachedPendingUsers);
+    return;
   }
-
-  try {
-    const res = await fetch('/api/auth/admin-dispatch-code', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ userId, customCode, assignedRole }),
-    });
-
-    const data = await res.json();
-
-    if (!res.ok) {
-      showToast('Dispatch Failed', data.error || 'Could not send code', 'error');
-      if (dispatchBtn) {
-        dispatchBtn.disabled = false;
-        dispatchBtn.innerHTML = origBtnHtml;
-      }
-      return;
-    }
-
-    showToast('Code Dispatched!', data.message, 'success');
-    loadPendingApprovals();
-    loadPendingApprovalsCount();
-    if (typeof loadAllUsers === 'function') {
-      loadAllUsers();
-    }
-  } catch (err) {
-    showToast('Error', err.message, 'error');
-    if (dispatchBtn) {
-      dispatchBtn.disabled = false;
-      dispatchBtn.innerHTML = origBtnHtml;
-    }
-  }
+  const filtered = _cachedPendingUsers.filter(u => {
+    return (
+      (u.name && u.name.toLowerCase().includes(q)) ||
+      (u.email && u.email.toLowerCase().includes(q)) ||
+      (u.phone && u.phone.toLowerCase().includes(q)) ||
+      (u.role && u.role.toLowerCase().includes(q))
+    );
+  });
+  renderApprovalsTable(filtered);
 }
+
+let _cachedAllUsers = [];
 
 /**
  * Admin Panel: Load All System Users & Manage Roles
@@ -1592,7 +1583,7 @@ async function loadAllUsers() {
 
   tbody.innerHTML = `
     <tr>
-      <td colspan="5" class="py-8 text-center text-slate-400">
+      <td colspan="6" class="py-8 text-center text-slate-400 font-sans">
         <i data-lucide="loader" class="w-5 h-5 animate-spin mx-auto mb-1 text-blue-600"></i>
         Loading user directory...
       </td>
@@ -1605,79 +1596,188 @@ async function loadAllUsers() {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (!res.ok) {
-      tbody.innerHTML = `<tr><td colspan="5" class="py-6 text-center text-rose-500 font-sans">Failed to load user directory.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="6" class="py-6 text-center text-rose-500 font-sans">Failed to load user directory.</td></tr>`;
       return;
     }
     const data = await res.json();
-    const users = data.users || [];
-    if (users.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="5" class="py-6 text-center text-slate-400 font-sans">No users registered yet.</td></tr>`;
+    _cachedAllUsers = data.users || [];
+    renderUserDirectoryTable(_cachedAllUsers);
+  } catch (err) {
+    console.error('Failed to load users directory:', err);
+    tbody.innerHTML = `<tr><td colspan="6" class="py-6 text-center text-rose-500 font-sans">Error: ${err.message}</td></tr>`;
+  }
+}
+
+function renderUserDirectoryTable(users) {
+  const tbody = document.getElementById('all-users-table-body');
+  if (!tbody) return;
+
+  if (users.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6" class="py-6 text-center text-slate-400 font-sans">No users registered yet.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = users.map(u => {
+    const isSelf = u.id === currentUser.id;
+    const isAdmin = u.role === 'admin';
+
+    let statusBadge = '<span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 font-bold text-[10px]">ACTIVE</span>';
+    if (u.account_status === 'AWAITING_ADMIN_APPROVAL' || u.account_status === 'PENDING_ADMIN_CODE') {
+      statusBadge = '<span class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200 font-bold text-[10px] animate-pulse">AWAITING CODE</span>';
+    } else if (u.account_status === 'AWAITING_USER_CODE') {
+      statusBadge = '<span class="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 border border-blue-200 font-bold text-[10px]">CODE DISPATCHED</span>';
+    } else if (u.account_status === 'PENDING_OTP') {
+      statusBadge = '<span class="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 font-bold text-[10px]">PENDING OTP</span>';
+    }
+
+    const assignedCodeHtml = u.admin_auth_code 
+      ? `<div class="mt-1 flex items-center gap-1 font-mono text-[10px] text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-200 w-fit" title="Assigned Authorization Code"><i data-lucide="key" class="w-3 h-3 text-purple-500"></i> ${u.admin_auth_code}</div>`
+      : `<div class="mt-1 text-[10px] text-slate-400 font-mono">—</div>`;
+
+    return `
+      <tr class="hover:bg-slate-50 transition">
+        <td class="py-3.5 px-4">
+          <div class="font-bold text-slate-900 font-sans text-xs flex items-center gap-1.5">
+            ${u.name}
+            ${isSelf ? '<span class="text-[10px] bg-purple-100 text-purple-700 font-bold px-1.5 py-0.5 rounded-md border border-purple-200">You</span>' : ''}
+          </div>
+          <div class="text-slate-500 text-[10px] font-mono">${u.email}</div>
+        </td>
+        <td class="py-3.5 px-4 font-mono text-slate-700">${u.phone || '—'}</td>
+        <td class="py-3.5 px-4">
+          ${statusBadge}
+          ${assignedCodeHtml}
+        </td>
+        <td class="py-3.5 px-4">
+          ${isAdmin ? `
+            <span class="px-2.5 py-1 rounded-lg bg-purple-100 text-purple-800 border border-purple-200 font-bold text-xs inline-flex items-center gap-1 font-sans">
+              <i data-lucide="shield" class="w-3 h-3 text-purple-600"></i> Administrator
+            </span>
+          ` : `
+            <select
+              id="role-change-${u.id}"
+              class="px-2.5 py-1 text-xs font-semibold rounded-lg border border-slate-200 bg-white text-slate-800 focus:ring-1 focus:ring-blue-500 cursor-pointer shadow-xs"
+            >
+              <option value="owner" ${u.role === 'owner' ? 'selected' : ''}>Document Owner</option>
+              <option value="viewer" ${u.role === 'viewer' ? 'selected' : ''}>Document Viewer</option>
+            </select>
+          `}
+        </td>
+        <td class="py-3.5 px-4">
+          ${isAdmin ? `
+            <span class="text-xs text-slate-400 font-sans">Master Authority</span>
+          ` : `
+            <button
+              type="button"
+              id="del-perm-btn-${u.id}"
+              onclick="handleToggleDeletePermission('${u.id}', ${!u.can_delete})"
+              class="px-2.5 py-1 text-[11px] font-semibold rounded-lg border transition cursor-pointer flex items-center gap-1 ${u.can_delete ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200'}"
+              title="Toggle File Deletion Privilege"
+            >
+              <i data-lucide="${u.can_delete ? 'check' : 'lock'}" class="w-3 h-3"></i>
+              ${u.can_delete ? 'Allowed' : 'Restricted'}
+            </button>
+          `}
+        </td>
+        <td class="py-3.5 px-4">
+          ${isAdmin ? `<span class="text-xs text-slate-400 font-sans">Master Admin</span>` : `
+            <button
+              type="button"
+              id="role-btn-${u.id}"
+              onclick="handleUpdateUserRole('${u.id}', document.getElementById('role-change-${u.id}').value)"
+              class="px-3 py-1 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200 transition cursor-pointer flex items-center gap-1"
+            >
+              <i data-lucide="check" class="w-3 h-3"></i> Apply
+            </button>
+          `}
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  if (window.lucide) lucide.createIcons();
+}
+
+function handleUserDirectorySearch(query) {
+  const q = (query || '').toLowerCase().trim();
+  if (!q) {
+    renderUserDirectoryTable(_cachedAllUsers);
+    return;
+  }
+  const filtered = _cachedAllUsers.filter(u => {
+    return (
+      (u.name && u.name.toLowerCase().includes(q)) ||
+      (u.email && u.email.toLowerCase().includes(q)) ||
+      (u.phone && u.phone.toLowerCase().includes(q)) ||
+      (u.role && u.role.toLowerCase().includes(q)) ||
+      (u.account_status && u.account_status.toLowerCase().includes(q)) ||
+      (u.admin_auth_code && u.admin_auth_code.toLowerCase().includes(q))
+    );
+  });
+  renderUserDirectoryTable(filtered);
+}
+
+/**
+ * Toggle File Deletion Privilege for a User (Admin Only)
+ */
+async function handleToggleDeletePermission(userId, canDelete) {
+  const token = getToken();
+  if (!token) return;
+
+  try {
+    const res = await fetch('/api/auth/set-user-delete-permission', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ userId, canDelete }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      showToast('Action Failed', data.error || 'Failed to update deletion privilege', 'error');
       return;
     }
 
-    tbody.innerHTML = users.map(u => {
-      const isSelf = u.id === currentUser.id;
-      const isAdmin = u.role === 'admin';
-
-      let statusBadge = '<span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 font-bold">ACTIVE</span>';
-      if (u.account_status === 'AWAITING_ADMIN_APPROVAL' || u.account_status === 'PENDING_ADMIN_CODE') {
-        statusBadge = '<span class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200 font-bold animate-pulse">AWAITING CODE</span>';
-      } else if (u.account_status === 'AWAITING_USER_CODE') {
-        statusBadge = '<span class="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 border border-blue-200 font-bold">CODE DISPATCHED</span>';
-      } else if (u.account_status === 'PENDING_OTP') {
-        statusBadge = '<span class="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 font-bold">PENDING OTP</span>';
-      }
-
-      return `
-        <tr class="hover:bg-slate-50 transition">
-          <td class="py-3.5 px-4">
-            <div class="font-bold text-slate-900 font-sans text-xs flex items-center gap-1.5">
-              ${u.name}
-              ${isSelf ? '<span class="text-[10px] bg-purple-100 text-purple-700 font-bold px-1.5 py-0.5 rounded-md border border-purple-200">You</span>' : ''}
-            </div>
-            <div class="text-slate-500 text-[10px] font-mono">${u.email}</div>
-          </td>
-          <td class="py-3.5 px-4 font-mono text-slate-700">${u.phone || '—'}</td>
-          <td class="py-3.5 px-4">${statusBadge}</td>
-          <td class="py-3.5 px-4">
-            ${isAdmin ? `
-              <span class="px-2.5 py-1 rounded-lg bg-purple-100 text-purple-800 border border-purple-200 font-bold text-xs inline-flex items-center gap-1 font-sans">
-                <i data-lucide="shield" class="w-3 h-3 text-purple-600"></i> Administrator
-              </span>
-            ` : `
-              <select
-                id="role-change-${u.id}"
-                class="px-2.5 py-1 text-xs font-semibold rounded-lg border border-slate-200 bg-white text-slate-800 focus:ring-1 focus:ring-blue-500 cursor-pointer shadow-xs"
-              >
-                <option value="owner" ${u.role === 'owner' ? 'selected' : ''}>Document Owner</option>
-                <option value="viewer" ${u.role === 'viewer' ? 'selected' : ''}>Document Viewer</option>
-              </select>
-            `}
-          </td>
-          <td class="py-3.5 px-4">
-            ${isAdmin ? `<span class="text-xs text-slate-400 font-sans">Master Admin</span>` : `
-              <button
-                type="button"
-                id="role-btn-${u.id}"
-                onclick="handleUpdateUserRole('${u.id}', document.getElementById('role-change-${u.id}').value)"
-                class="px-3 py-1 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200 transition cursor-pointer flex items-center gap-1"
-              >
-                <i data-lucide="check" class="w-3 h-3"></i> Apply Role
-              </button>
-            `}
-          </td>
-        </tr>
-      `;
-    }).join('');
-
-    try {
-      if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
-    } catch (e) {}
+    showToast('Permission Updated', data.message, 'success');
+    loadAllUsers();
   } catch (err) {
-    console.error('Failed to load users directory:', err);
-    tbody.innerHTML = `<tr><td colspan="5" class="py-6 text-center text-rose-500 font-sans">Error: ${err.message}</td></tr>`;
+    showToast('Error', err.message, 'error');
   }
 }
+
+/**
+ * iOS-Style Logout Confirmation Modal
+ */
+function openLogoutModal() {
+  const modal = document.getElementById('modal-logout-confirm');
+  if (modal) {
+    modal.classList.remove('hidden');
+    modal.style.setProperty('display', 'flex', 'important');
+  }
+  if (window.lucide) lucide.createIcons();
+}
+
+function closeLogoutModal() {
+  const modal = document.getElementById('modal-logout-confirm');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.style.setProperty('display', 'none', 'important');
+  }
+}
+
+function confirmLogout() {
+  closeLogoutModal();
+  clearSession();
+}
+
+window.handleApprovalsSearch = handleApprovalsSearch;
+window.handleUserDirectorySearch = handleUserDirectorySearch;
+window.handleToggleDeletePermission = handleToggleDeletePermission;
+window.openLogoutModal = openLogoutModal;
+window.closeLogoutModal = closeLogoutModal;
+window.confirmLogout = confirmLogout;
 
 /**
  * Administrator updates a user role

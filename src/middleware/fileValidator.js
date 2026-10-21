@@ -31,6 +31,28 @@ const upload = multer({
   },
 });
 
+const uploadMultiple = multer({
+  storage,
+  limits: {
+    fileSize: MAX_BYTES,
+    files: 10,
+  },
+  fileFilter: (req, file, cb) => {
+    const ext = (path.extname(file.originalname) || '').toLowerCase().replace('.', '');
+    const allowed = ['pdf', 'png', 'jpg', 'jpeg', 'docx', 'xlsx', 'txt', 'csv', 'json'];
+
+    if (!allowed.includes(ext)) {
+      return cb(new Error(`Forbidden file extension .${ext}. Allowed types: ${allowed.join(', ')}`), false);
+    }
+
+    if (file.originalname.includes('..') || file.originalname.includes('/') || file.originalname.includes('\\')) {
+      return cb(new Error('Invalid filename: Path traversal sequence detected.'), false);
+    }
+
+    cb(null, true);
+  },
+});
+
 /**
  * Middleware that runs after multer memory buffer is populated.
  * Strictly verifies magic bytes and file signature.
@@ -60,6 +82,7 @@ function validateUploadedFile(req, res, next) {
 
 module.exports = {
   upload,
+  uploadMultiple,
   validateUploadedFile,
   MAX_BYTES,
 };

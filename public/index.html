@@ -54,25 +54,12 @@
         </div>
       </div>
 
-      <!-- Device Push Notification Bell & User Session Actions -->
-      <div class="flex items-center gap-2.5">
-        <button
-          type="button"
-          id="btn-desktop-notif"
-          onclick="toggleDesktopNotifications()"
-          class="relative p-2 rounded-xl text-slate-600 hover:text-blue-600 hover:bg-blue-50 border border-slate-200 shadow-xs transition flex items-center justify-center cursor-pointer"
-          title="Enable Desktop / Device Notifications"
-        >
-          <i data-lucide="bell" class="w-4 h-4"></i>
-          <span id="notif-permission-dot" class="absolute top-1 right-1 w-2 h-2 rounded-full bg-emerald-500 hidden"></span>
+      <!-- Single Unified Notification Bell & User Session Actions -->
+      <div class="flex items-center gap-2.5" id="auth-header-container">
+        <!-- Rendered dynamically by auth.js -->
+        <button onclick="showPortalAuthTab('login'); window.scrollTo({top: 0, behavior: 'smooth'});" class="px-4 py-2 text-xs font-bold text-white bg-blue-600 rounded-2xl hover:bg-blue-700 shadow-sm transition">
+          Sign In
         </button>
-
-        <div class="flex items-center gap-3" id="auth-header-container">
-          <!-- Rendered dynamically by auth.js -->
-          <button onclick="showPortalAuthTab('login'); window.scrollTo({top: 0, behavior: 'smooth'});" class="px-4 py-2 text-xs font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 shadow-sm transition">
-            Sign In
-          </button>
-        </div>
       </div>
     </div>
   </header>
@@ -519,12 +506,16 @@
       </nav>
 
       <div class="flex items-center gap-2">
-        <button onclick="verifyCryptographicChain()" class="px-3.5 py-2 text-xs font-semibold rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 flex items-center gap-1.5 transition">
+        <button onclick="verifyCryptographicChain()" class="px-3.5 py-2 text-xs font-semibold rounded-2xl bg-emerald-50 text-emerald-700 border border-emerald-200/80 hover:bg-emerald-100 flex items-center gap-1.5 transition cursor-pointer shadow-xs">
           <i data-lucide="check-circle" class="w-4 h-4 text-emerald-600"></i>
           Verify Ledger Chain
         </button>
-        <button id="btn-open-upload" onclick="openUploadModal()" class="px-4 py-2 text-sm font-semibold rounded-xl bg-blue-600 text-white hover:bg-blue-700 shadow-sm flex items-center gap-1.5 transition">
-          <i data-lucide="upload" class="w-4 h-4"></i> Upload Document
+        <button id="btn-open-import" onclick="openImportModal()" class="px-3.5 py-2 text-xs font-semibold rounded-2xl bg-purple-50 text-purple-700 border border-purple-200/80 hover:bg-purple-100 flex items-center gap-1.5 transition cursor-pointer shadow-xs">
+          <i data-lucide="folder-input" class="w-4 h-4 text-purple-600"></i>
+          Import Files
+        </button>
+        <button id="btn-open-upload" onclick="openUploadModal()" class="px-4 py-2 text-xs font-semibold rounded-2xl bg-blue-600 text-white hover:bg-blue-700 shadow-sm flex items-center gap-1.5 transition cursor-pointer">
+          <i data-lucide="plus" class="w-4 h-4"></i> New Document
         </button>
       </div>
     </div>
@@ -628,7 +619,19 @@
           </div>
         </div>
 
-        <div class="flex items-center gap-2">
+        <div class="flex flex-wrap items-center gap-2">
+          <!-- Real-time Search Input -->
+          <div class="relative w-full sm:w-56">
+            <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5"></i>
+            <input
+              type="text"
+              id="search-audit-ledger"
+              oninput="handleAuditSearch(this.value)"
+              placeholder="Search ledger records..."
+              class="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+            />
+          </div>
+
           <!-- Status Filter -->
           <select id="audit-filter-status" onchange="loadAuditLogs()" class="px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500">
             <option value="">All Statuses</option>
@@ -693,9 +696,21 @@
             </div>
           </div>
 
-          <button onclick="loadPendingApprovals(); loadAllUsers();" class="px-3.5 py-2 text-xs font-semibold rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center gap-1.5 transition cursor-pointer">
-            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Refresh Approvals
-          </button>
+          <div class="flex items-center gap-2">
+            <div class="relative w-48 sm:w-60">
+              <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5"></i>
+              <input
+                type="text"
+                id="search-onboarding-approvals"
+                oninput="handleApprovalsSearch(this.value)"
+                placeholder="Search pending users..."
+                class="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-purple-500 outline-none"
+              />
+            </div>
+            <button onclick="loadPendingApprovals(); loadAllUsers();" class="px-3.5 py-1.5 text-xs font-semibold rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center gap-1.5 transition cursor-pointer shrink-0">
+              <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Refresh
+            </button>
+          </div>
         </div>
 
         <!-- Approvals Table Container -->
@@ -732,9 +747,21 @@
             </div>
           </div>
 
-          <button onclick="loadAllUsers()" class="px-3.5 py-2 text-xs font-semibold rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 flex items-center gap-1.5 transition cursor-pointer">
-            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Refresh Directory
-          </button>
+          <div class="flex items-center gap-2">
+            <div class="relative w-48 sm:w-60">
+              <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5"></i>
+              <input
+                type="text"
+                id="search-user-directory"
+                oninput="handleUserDirectorySearch(this.value)"
+                placeholder="Search directory..."
+                class="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+              />
+            </div>
+            <button onclick="loadAllUsers()" class="px-3.5 py-1.5 text-xs font-semibold rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 flex items-center gap-1.5 transition cursor-pointer shrink-0">
+              <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Refresh
+            </button>
+          </div>
         </div>
 
         <!-- User Directory Table Container -->
@@ -743,11 +770,12 @@
             <table class="w-full text-left text-xs">
               <thead class="bg-slate-50 text-slate-600 uppercase font-semibold border-b border-slate-200">
                 <tr>
-                  <th class="py-3.5 px-4">User Name & Email</th>
+                  <th class="py-3.5 px-4">User Details</th>
                   <th class="py-3.5 px-4">Phone</th>
-                  <th class="py-3.5 px-4">Account Status</th>
-                  <th class="py-3.5 px-4">Current Role Privileges</th>
-                  <th class="py-3.5 px-4">Change Role Action</th>
+                  <th class="py-3.5 px-4">Status & Assigned Code</th>
+                  <th class="py-3.5 px-4">Role Privileges</th>
+                  <th class="py-3.5 px-4">File Deletion Access</th>
+                  <th class="py-3.5 px-4">Role Action</th>
                 </tr>
               </thead>
               <tbody id="all-users-table-body" class="divide-y divide-slate-100 font-mono text-[11px]">
@@ -759,6 +787,84 @@
       </div>
     </div>
 
+  </div>
+
+  <!-- MODAL: Logout Confirmation (iOS Apple HIG Design) -->
+  <div id="modal-logout-confirm" class="modal-backdrop hidden fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 items-center justify-center p-4">
+    <div class="bg-white/95 backdrop-blur-xl rounded-3xl border border-slate-200/80 shadow-2xl max-w-sm w-full p-6 animate-scale-up flex flex-col gap-4 text-center">
+      <div class="w-14 h-14 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto shadow-inner">
+        <i data-lucide="log-out" class="w-7 h-7"></i>
+      </div>
+      <div>
+        <h3 class="text-base font-bold text-slate-900">Sign Out of GuardFile?</h3>
+        <p class="text-xs text-slate-500 mt-1 leading-relaxed">Your encrypted zero-trust session will be securely terminated. All confidential views will be immediately locked.</p>
+      </div>
+      <div class="flex items-center gap-2 pt-2 border-t border-slate-100">
+        <button type="button" onclick="closeLogoutModal()" class="flex-1 py-2.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-2xl transition cursor-pointer">
+          Cancel
+        </button>
+        <button type="button" onclick="confirmLogout()" class="flex-1 py-2.5 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-2xl shadow-sm transition cursor-pointer">
+          Sign Out
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: Batch Import Files (Admin & Document Owners) -->
+  <div id="modal-import" class="modal-backdrop hidden fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 items-center justify-center p-4">
+    <div class="bg-white/95 backdrop-blur-xl rounded-3xl border border-slate-200/80 shadow-2xl max-w-lg w-full p-6 animate-scale-up flex flex-col gap-4">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center">
+            <i data-lucide="folder-input" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-slate-900">Import Secured Documents</h3>
+            <p class="text-xs text-slate-500">Batch import multiple files with automatic cryptographic sealing</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeImportModal()" class="text-slate-400 hover:text-slate-600 transition cursor-pointer">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <form id="import-form" onsubmit="handleImportSubmit(event); return false;" class="flex flex-col gap-3.5">
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Security Category</label>
+          <select id="import-category" class="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-purple-500 outline-none">
+            <option value="HR / Payroll">HR / Payroll</option>
+            <option value="Engineering">Engineering</option>
+            <option value="Finance">Finance</option>
+            <option value="Legal">Legal</option>
+            <option value="Confidential" selected>Confidential</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Select Files (Up to 10 at once)</label>
+          <div class="border-2 border-dashed border-slate-200 hover:border-purple-400 rounded-2xl p-6 text-center bg-slate-50/50 hover:bg-purple-50/20 transition cursor-pointer" onclick="document.getElementById('import-files-input').click()">
+            <i data-lucide="cloud-upload" class="w-8 h-8 text-purple-500 mx-auto mb-2"></i>
+            <p class="text-xs font-semibold text-slate-700">Click to choose files or drag & drop</p>
+            <p class="text-[11px] text-slate-400 mt-1">PDF, DOCX, XLSX, TXT, PNG, JPG (Max 15MB each)</p>
+            <input type="file" id="import-files-input" multiple class="hidden" onchange="handleImportFilesSelected(this.files)" />
+          </div>
+        </div>
+
+        <!-- Selected Files List -->
+        <div id="import-selected-list" class="max-h-36 overflow-y-auto space-y-1.5 text-xs text-slate-600 font-mono"></div>
+
+        <div id="import-error" class="hidden p-3 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs"></div>
+
+        <div class="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+          <button type="button" onclick="closeImportModal()" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition cursor-pointer">
+            Cancel
+          </button>
+          <button type="submit" id="btn-submit-import" class="px-5 py-2 text-xs font-bold text-white bg-purple-600 hover:bg-purple-700 rounded-2xl shadow-xs transition flex items-center gap-1.5 cursor-pointer">
+            <i data-lucide="shield-check" class="w-4 h-4"></i> Seal & Import All
+          </button>
+        </div>
+      </form>
+    </div>
   </div>
 
   <!-- MODAL: Upload Document -->
@@ -996,10 +1102,10 @@
   </div>
 
   <!-- Scripts with cache busting query string -->
-  <script src="/js/auth.js?v=4.2"></script>
-  <script src="/js/documents.js?v=4.2"></script>
-  <script src="/js/audit.js?v=4.2"></script>
-  <script src="/js/app.js?v=4.2"></script>
+  <script src="/js/auth.js?v=4.3"></script>
+  <script src="/js/documents.js?v=4.3"></script>
+  <script src="/js/audit.js?v=4.3"></script>
+  <script src="/js/app.js?v=4.3"></script>
   <script>
     // Safe initialization & resilient tab, Google auth, and form bindings
     document.addEventListener('DOMContentLoaded', () => {
@@ -1075,6 +1181,15 @@
         headerBell.addEventListener('click', (e) => {
           e.preventDefault();
           if (typeof switchTab === 'function') switchTab('approvals');
+        });
+      }
+
+      // Import files button
+      const btnImport = document.getElementById('btn-open-import');
+      if (btnImport) {
+        btnImport.addEventListener('click', (e) => {
+          e.preventDefault();
+          if (typeof openImportModal === 'function') openImportModal();
         });
       }
 

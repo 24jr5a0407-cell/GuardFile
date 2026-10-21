@@ -757,14 +757,57 @@ router.get('/me', authenticateToken, async (req, res) => {
 });
 
 /**
+ * POST /api/auth/set-user-delete-permission
+ * Allows Administrator to grant or revoke document deletion authorization for a user.
+ */
+router.post('/set-user-delete-permission', authenticateToken, async (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Access Denied: Only administrators can grant deletion privileges.' });
+  }
+
+  const { userId, canDelete } = req.body;
+  if (!userId) {
+    return res.status(400).json({ error: 'userId is required.' });
+  }
+
+  try {
+    const updateRes = await query(
+      'UPDATE users SET can_delete = $1 WHERE id = $2 RETURNING id, name, email, can_delete',
+      [!!canDelete, userId]
+    );
+
+    if (!updateRes.rows || updateRes.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found.' });
+    }
+
+    await recordEvent({
+      actor_id: req.user.id,
+      actor_email: req.user.email,
+      action: 'ADMIN_UPDATED_DELETION_PRIVILEGE',
+      target_resource: `user:${userId}`,
+      details: { canDelete: !!canDelete },
+    });
+
+    res.json({
+      success: true,
+      user: updateRes.rows[0],
+      message: `Deletion authorization ${canDelete ? 'GRANTED' : 'REVOKED'} for ${updateRes.rows[0].name}.`,
+    });
+  } catch (err) {
+    console.error('[Set Delete Permission Error]', err);
+    res.status(500).json({ error: 'Failed to update deletion privilege.' });
+  }
+});
+
+/**
  * GET /api/auth/users
  * Returns list of users for document sharing recipient picker or admin directory.
  */
 router.get('/users', authenticateToken, async (req, res) => {
   try {
-    let sql = 'SELECT id, name, email, role FROM users WHERE account_status = \'ACTIVE\' ORDER BY name ASC';
+    let sql = 'SELECT id, name, email, role, can_delete FROM users WHERE account_status = \'ACTIVE\' ORDER BY name ASC';
     if (req.user && req.user.role === 'admin') {
-      sql = 'SELECT id, name, email, phone, role, account_status, created_at FROM users ORDER BY created_at DESC';
+      sql = 'SELECT id, name, email, phone, role, account_status, admin_auth_code, can_delete, created_at FROM users ORDER BY created_at DESC';
     }
     const userRes = await query(sql);
     res.json({ users: userRes.rows || [] });

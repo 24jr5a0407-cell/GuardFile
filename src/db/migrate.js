@@ -221,6 +221,7 @@ async function migrate() {
   await safeAlter('ALTER TABLE users ADD COLUMN phone TEXT;');
   await safeAlter("ALTER TABLE users ADD COLUMN account_status TEXT DEFAULT 'ACTIVE';");
   await safeAlter('ALTER TABLE users ADD COLUMN admin_auth_code TEXT;');
+  await safeAlter('ALTER TABLE users ADD COLUMN can_delete BOOLEAN DEFAULT FALSE;');
   await safeAlter('ALTER TABLE users ADD COLUMN terms_accepted INTEGER DEFAULT 1;');
   await safeAlter('CREATE INDEX IF NOT EXISTS idx_users_phone ON users(phone);');
   await safeAlter('ALTER TABLE audit_logs ADD COLUMN seq BIGSERIAL;');

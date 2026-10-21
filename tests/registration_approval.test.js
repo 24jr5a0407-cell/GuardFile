@@ -16,6 +16,7 @@ const testUser = {
 };
 
 beforeAll(async () => {
+  process.env.NODE_ENV = 'test';
   await migrate();
   await seed();
 

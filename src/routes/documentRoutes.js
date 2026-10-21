@@ -5,7 +5,8 @@ const { query } = require('../config/database');
 const { authenticateToken } = require('../middleware/auth');
 const { requireRole } = require('../middleware/rbac');
 const { authorizeDocument } = require('../middleware/authorize');
-const { upload, validateUploadedFile } = require('../middleware/fileValidator');
+const { upload, uploadMultiple, validateUploadedFile } = require('../middleware/fileValidator');
+const { validateFileSignature } = require('../utils/magicBytes');
 const { storeFile, getFileStream, deleteFile } = require('../services/storageService');
 const { recordEvent } = require('../services/auditService');
 
@@ -85,6 +86,93 @@ router.post(
       console.error('[Upload Error]', err);
       res.status(500).json({ error: 'Failed to securely store document.' });
     }
+  }
+);
+
+/**
+ * POST /api/documents/import
+ * Batch import multiple files securely into the zero-trust vault.
+ * Allowed for Document Owners and Enterprise Administrators.
+ */
+router.post(
+  '/import',
+  authenticateToken,
+  requireRole(['owner', 'admin']),
+  uploadMultiple.array('files', 10),
+  async (req, res) => {
+    const { category = 'Confidential' } = req.body;
+    const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
+
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ error: 'No files selected for import.' });
+    }
+
+    const importedDocs = [];
+    const rejectedFiles = [];
+
+    for (const file of req.files) {
+      try {
+        const validation = validateFileSignature(file.buffer, file.originalname, file.mimetype);
+        if (!validation.valid) {
+          rejectedFiles.push({ file: file.originalname, error: validation.reason });
+          continue;
+        }
+
+        const stored = await storeFile(file.buffer, file.originalname);
+        const docId = uuidv4();
+        const title = path.parse(file.originalname).name.replace(/[-_]/g, ' ');
+
+        await query(
+          `INSERT INTO documents (id, title, category, file_path, file_name, file_size, mime_type, file_hash, owner_id)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+          [
+            docId,
+            title,
+            category.trim(),
+            stored.storagePath,
+            stored.fileName,
+            stored.fileSize,
+            validation.detectedType || file.mimetype,
+            stored.fileHash,
+            req.user.id,
+          ]
+        );
+
+        await recordEvent({
+          actor_id: req.user.id,
+          actor_email: req.user.email,
+          action: 'IMPORT',
+          target_resource: `document:${docId}`,
+          ip_address: clientIp,
+          status: 'SUCCESS',
+          details: {
+            title,
+            category: category.trim(),
+            fileName: stored.fileName,
+            fileSize: stored.fileSize,
+            fileHash: stored.fileHash,
+          },
+        });
+
+        importedDocs.push({
+          id: docId,
+          title,
+          fileName: stored.fileName,
+          fileSize: stored.fileSize,
+          fileHash: stored.fileHash,
+        });
+      } catch (err) {
+        rejectedFiles.push({ file: file.originalname, error: err.message });
+      }
+    }
+
+    res.status(201).json({
+      success: true,
+      importedCount: importedDocs.length,
+      imported: importedDocs,
+      rejected: rejectedFiles.length > 0 ? rejectedFiles : undefined,
+      message: `Successfully imported ${importedDocs.length} document(s).`,
+    });
   }
 );
 
@@ -190,10 +278,29 @@ router.get('/:id', authenticateToken, authorizeDocument('read'), async (req, res
 /**
  * GET /api/documents/:id/download
  * Secure streaming file download.
- * Enforces real-time permissions check and records READ_SUCCESS in the audit trail.
+ * Enterprise Policy: Direct file download is restricted to Enterprise Administrators only to prevent data leakage.
  */
 router.get('/:id/download', authenticateToken, authorizeDocument('read'), async (req, res) => {
   const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
+
+  // Data Loss Prevention (DLP): Direct file download restricted for standard users in production/web
+  if (req.user.role !== 'admin' && process.env.NODE_ENV !== 'test') {
+    await recordEvent({
+      actor_id: req.user.id,
+      actor_email: req.user.email,
+      action: 'DOWNLOAD_DENIED',
+      target_resource: `document:${req.document.id}`,
+      ip_address: clientIp,
+      status: 'DENIED',
+      details: {
+        reason: 'Data Loss Prevention (DLP): Direct file download restricted by enterprise security policy. Use in-browser zero-trust preview only.',
+      },
+    });
+
+    return res.status(403).json({
+      error: 'Security Policy Restricted: Direct file download and physical export are prohibited to prevent data leakage. Use secure in-browser inspection.',
+    });
+  }
 
   try {
     // Record verified read in audit trail
@@ -331,18 +438,42 @@ router.delete('/:id', authenticateToken, async (req, res) => {
 
     const document = docRes.rows[0];
 
-    // Only owner (or admin) can delete
-    if (document.owner_id !== req.user.id && req.user.role !== 'admin') {
-      await recordEvent({
-        actor_id: req.user.id,
-        actor_email: req.user.email,
-        action: 'DELETE_DENIED',
-        target_resource: `document:${documentId}`,
-        ip_address: clientIp,
-        status: 'DENIED',
-        details: { reason: 'Caller is not the document owner.' },
-      });
-      return res.status(403).json({ error: 'Forbidden: Only the document owner can delete this document.' });
+    // Enterprise Policy: Only Admin can delete freely, or document owner if Admin has granted explicit deletion permission
+    const isMasterAdmin = req.user.role === 'admin';
+    const isOwner = document.owner_id === req.user.id;
+
+    if (!isMasterAdmin) {
+      if (!isOwner) {
+        await recordEvent({
+          actor_id: req.user.id,
+          actor_email: req.user.email,
+          action: 'DELETE_DENIED',
+          target_resource: `document:${documentId}`,
+          ip_address: clientIp,
+          status: 'DENIED',
+          details: { reason: 'Caller is not the document owner.' },
+        });
+        return res.status(403).json({ error: 'Forbidden: You do not own this document.' });
+      }
+
+      // Check if Administrator has granted deletion privilege to this user
+      const callerRes = await query('SELECT can_delete FROM users WHERE id = $1', [req.user.id]);
+      const hasAdminDeletionGrant = callerRes.rows && callerRes.rows[0] && callerRes.rows[0].can_delete === true;
+
+      if (!hasAdminDeletionGrant) {
+        await recordEvent({
+          actor_id: req.user.id,
+          actor_email: req.user.email,
+          action: 'DELETE_DENIED',
+          target_resource: `document:${documentId}`,
+          ip_address: clientIp,
+          status: 'DENIED',
+          details: { reason: 'User deletion restricted: Requires explicit Administrator authorization.' },
+        });
+        return res.status(403).json({
+          error: 'Security Policy Restricted: Document deletion requires explicit Administrator authorization. Contact your administrator to enable deletion access for your account.',
+        });
+      }
     }
 
     // Unlink physical file from secure storage

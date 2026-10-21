@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS users (
     is_2fa_enabled BOOLEAN DEFAULT FALSE,
     account_status VARCHAR(50) DEFAULT 'ACTIVE',
     admin_auth_code VARCHAR(50),
+    can_delete BOOLEAN DEFAULT FALSE,
     terms_accepted BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP

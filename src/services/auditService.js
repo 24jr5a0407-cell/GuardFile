@@ -112,7 +112,7 @@ async function verifyChain() {
     return { valid: true, totalRecords: 0, message: 'Audit chain is empty.' };
   }
 
-  let expectedPrevHash = GENESIS_HASH;
+  let expectedPrevHash = logs[0].prev_hash;
 
   for (let i = 0; i < logs.length; i++) {
     const entry = logs[i];

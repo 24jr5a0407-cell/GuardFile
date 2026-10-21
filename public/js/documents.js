@@ -674,13 +674,24 @@ async function handleRevokeClick(docId, userId) {
 }
 
 function openUploadModal() {
-  document.getElementById('modal-upload')?.classList.remove('hidden');
-  document.getElementById('upload-error')?.classList.add('hidden');
+  const modal = document.getElementById('modal-upload');
+  const errorEl = document.getElementById('upload-error');
+  const form = document.getElementById('upload-form');
+  if (form) form.reset();
+  if (errorEl) errorEl.classList.add('hidden');
+  if (modal) {
+    modal.classList.remove('hidden');
+    modal.style.setProperty('display', 'flex', 'important');
+  }
+  if (window.lucide) lucide.createIcons();
 }
 
 function closeUploadModal() {
-  document.getElementById('modal-upload')?.classList.add('hidden');
-  document.getElementById('upload-form')?.reset();
+  const modal = document.getElementById('modal-upload');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.style.setProperty('display', 'none', 'important');
+  }
 }
 
 async function handleUploadSubmit(e) {
@@ -755,4 +766,8 @@ window.handleRevokeClick = handleRevokeClick;
 window.openUploadModal = openUploadModal;
 window.closeUploadModal = closeUploadModal;
 window.handleUploadSubmit = handleUploadSubmit;
+window.openImportModal = openImportModal;
+window.closeImportModal = closeImportModal;
+window.handleImportFilesSelected = handleImportFilesSelected;
+window.handleImportSubmit = handleImportSubmit;
 

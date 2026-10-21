@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS documents (
     file_size BIGINT NOT NULL,
     mime_type VARCHAR(100) NOT NULL,
     file_hash VARCHAR(64) NOT NULL, -- SHA-256 content checksum
+    file_data BYTEA, -- Resilient binary storage for serverless environments (Vercel)
     owner_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP

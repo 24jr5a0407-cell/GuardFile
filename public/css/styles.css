@@ -29,6 +29,15 @@
   pointer-events: auto !important;
 }
 
+.modal-backdrop button[aria-label="Close"],
+.modal-backdrop button[id^="btn-close-"],
+.modal-backdrop button[id^="btn-cancel-"] {
+  cursor: pointer !important;
+  pointer-events: auto !important;
+  z-index: 60 !important;
+  touch-action: manipulation !important;
+}
+
 /* 2. SMOOTH ANIMATIONS & MICRO-INTERACTIONS */
 @keyframes fadeIn {
   from { opacity: 0; }

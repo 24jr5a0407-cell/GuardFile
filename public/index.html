@@ -36,6 +36,8 @@
     }
   </script>
   <link rel="stylesheet" href="/css/styles.css">
+  <!-- Official Google Identity Services SDK -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body class="bg-slate-50 text-slate-800 antialiased min-h-screen flex flex-col font-sans">
 
@@ -823,7 +825,7 @@
             <p class="text-xs text-slate-500">Batch import multiple files with automatic cryptographic sealing</p>
           </div>
         </div>
-        <button type="button" onclick="closeImportModal()" class="text-slate-400 hover:text-slate-600 transition cursor-pointer">
+        <button type="button" id="btn-close-import" onclick="closeImportModal()" aria-label="Close" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center transition cursor-pointer">
           <i data-lucide="x" class="w-4 h-4"></i>
         </button>
       </div>
@@ -842,12 +844,12 @@
 
         <div>
           <label class="block text-xs font-semibold text-slate-700 mb-1">Select Files (Up to 10 at once)</label>
-          <div class="border-2 border-dashed border-slate-200 hover:border-purple-400 rounded-2xl p-6 text-center bg-slate-50/50 hover:bg-purple-50/20 transition cursor-pointer" onclick="document.getElementById('import-files-input').click()">
+          <label for="import-files-input" class="border-2 border-dashed border-purple-200 hover:border-purple-400 rounded-2xl p-6 text-center bg-purple-50/20 hover:bg-purple-50/40 transition cursor-pointer flex flex-col items-center justify-center relative">
             <i data-lucide="cloud-upload" class="w-8 h-8 text-purple-500 mx-auto mb-2"></i>
-            <p class="text-xs font-semibold text-slate-700">Click to choose files or drag & drop</p>
-            <p class="text-[11px] text-slate-400 mt-1">PDF, DOCX, XLSX, TXT, PNG, JPG (Max 15MB each)</p>
-            <input type="file" id="import-files-input" multiple class="hidden" onchange="handleImportFilesSelected(this.files)" />
-          </div>
+            <span class="text-xs font-semibold text-slate-700">Click to choose files or drag & drop</span>
+            <span class="text-[11px] text-slate-400 mt-1">PDF, DOCX, XLSX, TXT, PNG, JPG (Max 15MB each)</span>
+            <input type="file" id="import-files-input" multiple class="opacity-0 absolute inset-0 w-full h-full cursor-pointer" onchange="handleImportFilesSelected(this.files)" />
+          </label>
         </div>
 
         <!-- Selected Files List -->
@@ -856,7 +858,7 @@
         <div id="import-error" class="hidden p-3 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs"></div>
 
         <div class="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
-          <button type="button" onclick="closeImportModal()" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition cursor-pointer">
+          <button type="button" id="btn-cancel-import" onclick="closeImportModal()" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition cursor-pointer">
             Cancel
           </button>
           <button type="submit" id="btn-submit-import" class="px-5 py-2 text-xs font-bold text-white bg-purple-600 hover:bg-purple-700 rounded-2xl shadow-xs transition flex items-center gap-1.5 cursor-pointer">
@@ -874,8 +876,8 @@
         <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
           <i data-lucide="upload-cloud" class="w-5 h-5 text-blue-600"></i> Upload Secured Document
         </h3>
-        <button onclick="closeUploadModal()" class="text-slate-400 hover:text-slate-600">
-          <i data-lucide="x" class="w-5 h-5"></i>
+        <button type="button" id="btn-close-upload" onclick="closeUploadModal()" aria-label="Close" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center transition cursor-pointer">
+          <i data-lucide="x" class="w-4 h-4"></i>
         </button>
       </div>
 
@@ -898,14 +900,14 @@
 
         <div>
           <label class="block text-xs font-semibold text-slate-700 mb-1">Select File (Strict validation: PDF, DOCX, XLSX, TXT, PNG, JPG)</label>
-          <input type="file" id="upload-file" required class="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
+          <input type="file" id="upload-file" required class="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer" />
         </div>
 
         <div id="upload-error" class="hidden p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs"></div>
 
         <div class="flex items-center justify-end gap-2 pt-4 border-t border-slate-100">
-          <button type="button" onclick="closeUploadModal()" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl">Cancel</button>
-          <button type="submit" id="btn-submit-upload" class="px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-xs flex items-center gap-1.5">
+          <button type="button" id="btn-cancel-upload" onclick="closeUploadModal()" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition cursor-pointer">Cancel</button>
+          <button type="submit" id="btn-submit-upload" class="px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-xs flex items-center gap-1.5 transition cursor-pointer">
             <i data-lucide="shield" class="w-4 h-4"></i> Seal & Upload
           </button>
         </div>
@@ -923,8 +925,8 @@
           </h3>
           <p class="text-xs text-slate-500" id="perm-modal-doc-title">-</p>
         </div>
-        <button onclick="closePermissionsModal()" class="text-slate-400 hover:text-slate-600">
-          <i data-lucide="x" class="w-5 h-5"></i>
+        <button type="button" id="btn-close-permissions" onclick="closePermissionsModal()" aria-label="Close" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center transition cursor-pointer">
+          <i data-lucide="x" class="w-4 h-4"></i>
         </button>
       </div>
 
@@ -967,8 +969,8 @@
           <i data-lucide="file-text" class="w-5 h-5 text-blue-600"></i>
           <span class="text-sm font-bold text-slate-900" id="preview-modal-title">Document Preview</span>
         </div>
-        <button onclick="closePreviewModal()" class="text-slate-400 hover:text-slate-600">
-          <i data-lucide="x" class="w-5 h-5"></i>
+        <button type="button" id="btn-close-preview" onclick="closePreviewModal()" aria-label="Close" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center transition cursor-pointer">
+          <i data-lucide="x" class="w-4 h-4"></i>
         </button>
       </div>
       <div class="flex-1 bg-slate-100 p-4 flex items-center justify-center overflow-auto" id="preview-container">
@@ -977,30 +979,33 @@
     </div>
   </div>
 
-  <!-- MODAL: Google Workspace / SSO Identity Provider -->
+  <!-- MODAL: Google Workspace / Enterprise SSO Provider -->
   <div id="modal-google-auth" class="modal-backdrop hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 items-center justify-center p-4">
     <div class="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-sm w-full p-6 animate-scale-up flex flex-col gap-4">
       <div class="flex items-center justify-between pb-3 border-b border-slate-100">
         <div class="flex items-center gap-2.5">
-          <svg class="w-5 h-5" viewBox="0 0 24 24">
-            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
-            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
-          </svg>
-          <span class="text-xs font-bold text-slate-800 tracking-tight">Sign in with Google</span>
+          <div class="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+            <i data-lucide="shield-check" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <h3 class="text-xs font-bold text-slate-900 uppercase tracking-wider">Enterprise Google SSO</h3>
+            <p class="text-[10px] text-slate-400">Zero-Trust Verified Authentication</p>
+          </div>
         </div>
-        <button onclick="closeGoogleModal()" class="text-slate-400 hover:text-slate-600 transition cursor-pointer">
+        <button type="button" id="btn-close-google-auth" onclick="closeGoogleModal()" aria-label="Close" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center transition cursor-pointer">
           <i data-lucide="x" class="w-4 h-4"></i>
         </button>
       </div>
 
       <div class="text-left">
-        <h4 class="text-sm font-bold text-slate-900">Sign in to GuardFile</h4>
-        <p class="text-xs text-slate-500 mt-0.5">Use your active Google account or enter your Gmail address below</p>
+        <h4 class="text-sm font-bold text-slate-900">Sign in with Google</h4>
+        <p class="text-xs text-slate-500 mt-0.5">Authenticate with your verified Google email or corporate Workspace account</p>
       </div>
 
-      <!-- Direct Google Email Input (Always visible & prominent) -->
+      <!-- Official Google Identity Services Container -->
+      <div id="google-gsi-button" class="w-full flex justify-center"></div>
+
+      <!-- Direct Google Email Input -->
       <form id="google-direct-email-form" onsubmit="handleGoogleDirectEmailSubmit(event); return false;" class="flex flex-col gap-2">
         <label class="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Your Google Email</label>
         <div class="flex items-center gap-2">
@@ -1019,24 +1024,14 @@
             id="btn-google-direct-submit"
             class="px-3.5 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-xs transition flex items-center gap-1 cursor-pointer shrink-0"
           >
-            <span>Sign In</span>
+            <span>Continue</span>
             <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
           </button>
         </div>
       </form>
 
-      <div class="relative flex items-center justify-center my-1">
-        <div class="border-t border-slate-200 w-full"></div>
-        <span class="bg-white px-2.5 text-[10px] uppercase font-bold text-slate-400 tracking-wider absolute">or select saved account</span>
-      </div>
-
-      <!-- Dynamic Google Accounts List -->
-      <div id="google-accounts-list" class="flex flex-col gap-2 max-h-48 overflow-y-auto pr-0.5">
-        <!-- Rendered dynamically by renderGoogleAccountsList() in auth.js -->
-      </div>
-
       <div class="pt-2 border-t border-slate-100 text-center">
-        <p class="text-[10px] text-slate-400">Zero-Trust Google OAuth 2.0 with instant verified session activation.</p>
+        <p class="text-[10px] text-slate-400">Immediate verified session activation. No mock or cached accounts.</p>
       </div>
     </div>
   </div>
@@ -1049,8 +1044,8 @@
           <i data-lucide="file-check" class="w-5 h-5 text-blue-600"></i>
           <h3 class="text-base font-bold text-slate-900">GuardFile Terms of Service & Security Charter</h3>
         </div>
-        <button onclick="closeTermsModal()" class="text-slate-400 hover:text-slate-600">
-          <i data-lucide="x" class="w-5 h-5"></i>
+        <button type="button" id="btn-close-terms" onclick="closeTermsModal()" aria-label="Close" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center transition cursor-pointer">
+          <i data-lucide="x" class="w-4 h-4"></i>
         </button>
       </div>
 
@@ -1102,10 +1097,10 @@
   </div>
 
   <!-- Scripts with cache busting query string -->
-  <script src="/js/auth.js?v=4.3"></script>
-  <script src="/js/documents.js?v=4.3"></script>
-  <script src="/js/audit.js?v=4.3"></script>
-  <script src="/js/app.js?v=4.3"></script>
+  <script src="/js/auth.js?v=4.4"></script>
+  <script src="/js/documents.js?v=4.4"></script>
+  <script src="/js/audit.js?v=4.4"></script>
+  <script src="/js/app.js?v=4.4"></script>
   <script>
     // Safe initialization & resilient tab, Google auth, and form bindings
     document.addEventListener('DOMContentLoaded', () => {
@@ -1116,6 +1111,55 @@
       if (typeof initAuth === 'function') {
         initAuth();
       }
+
+      // Universal backdrop click-to-close handler
+      document.addEventListener('click', (e) => {
+        if (e.target && e.target.classList && e.target.classList.contains('modal-backdrop')) {
+          e.target.classList.add('hidden');
+          e.target.style.setProperty('display', 'none', 'important');
+          if (typeof _previewCleanupHandlers === 'function') {
+            _previewCleanupHandlers();
+            _previewCleanupHandlers = null;
+          }
+        }
+      });
+
+      // Universal Escape key listener to close modals
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          document.querySelectorAll('.modal-backdrop').forEach(m => {
+            m.classList.add('hidden');
+            m.style.setProperty('display', 'none', 'important');
+          });
+          if (typeof _previewCleanupHandlers === 'function') {
+            _previewCleanupHandlers();
+            _previewCleanupHandlers = null;
+          }
+        }
+      });
+
+      // Explicit close button bindings
+      const bindClick = (id, fn) => {
+        const el = document.getElementById(id);
+        if (el) {
+          el.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (typeof fn === 'function') fn();
+          });
+        }
+      };
+
+      bindClick('btn-close-import', () => (typeof closeImportModal === 'function') && closeImportModal());
+      bindClick('btn-cancel-import', () => (typeof closeImportModal === 'function') && closeImportModal());
+      bindClick('btn-close-upload', () => (typeof closeUploadModal === 'function') && closeUploadModal());
+      bindClick('btn-cancel-upload', () => (typeof closeUploadModal === 'function') && closeUploadModal());
+      bindClick('btn-close-preview', () => (typeof closePreviewModal === 'function') && closePreviewModal());
+      bindClick('btn-close-permissions', () => (typeof closePermissionsModal === 'function') && closePermissionsModal());
+      bindClick('btn-close-terms', () => (typeof closeTermsModal === 'function') && closeTermsModal());
+      bindClick('btn-close-google-auth', () => (typeof closeGoogleModal === 'function') && closeGoogleModal());
+      bindClick('btn-open-upload', () => (typeof openUploadModal === 'function') && openUploadModal());
+      bindClick('btn-open-import', () => (typeof openImportModal === 'function') && openImportModal());
 
       // Portal authentication tab switching bindings
       const loginTab = document.getElementById('portal-tab-btn-login');
@@ -1184,14 +1228,60 @@
         });
       }
 
-      // Import files button
-      const btnImport = document.getElementById('btn-open-import');
-      if (btnImport) {
-        btnImport.addEventListener('click', (e) => {
+      // Explicit Form Submit Listeners with immediate preventDefault
+      const loginForm = document.getElementById('portal-login-form');
+      if (loginForm) {
+        loginForm.addEventListener('submit', (e) => {
           e.preventDefault();
-          if (typeof openImportModal === 'function') openImportModal();
+          e.stopPropagation();
+          handlePortalLoginSubmit(e);
+          return false;
         });
       }
+
+      const regForm = document.getElementById('portal-register-form');
+      if (regForm) {
+        regForm.addEventListener('submit', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          handlePortalRegisterSubmit(e);
+          return false;
+        });
+      }
+
+      const otpForm = document.getElementById('portal-otp-form');
+      if (otpForm) {
+        otpForm.addEventListener('submit', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          handlePortalOtpSubmit(e);
+          return false;
+        });
+      }
+
+      const adminCodeForm = document.getElementById('portal-admin-code-form');
+      if (adminCodeForm) {
+        adminCodeForm.addEventListener('submit', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          handlePortalAdminCodeSubmit(e);
+          return false;
+        });
+      }
+
+      const googleDirectForm = document.getElementById('google-direct-email-form');
+      if (googleDirectForm) {
+        googleDirectForm.addEventListener('submit', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (typeof handleGoogleDirectEmailSubmit === 'function') {
+            handleGoogleDirectEmailSubmit(e);
+          }
+          return false;
+        });
+      }
+    });
+  </script>
 
       // Explicit Form Submit Listeners with immediate preventDefault
       const loginForm = document.getElementById('portal-login-form');

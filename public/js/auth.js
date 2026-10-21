@@ -1030,92 +1030,63 @@ async function checkAdminApprovalStatus(silent = false) {
 }
 
 /**
- * Google Social Auth Flow & Dynamic Account Management
+ * Official Google Sign-In & Enterprise Identity Integration
  */
-function handleGoogleSignIn() {
-  openGoogleModal();
-}
+function initGoogleIdentity() {
+  if (typeof google !== 'undefined' && google.accounts && google.accounts.id) {
+    try {
+      google.accounts.id.initialize({
+        client_id: '718873617382-sample.apps.googleusercontent.com',
+        callback: handleGoogleCredentialResponse,
+        auto_select: false,
+        cancel_on_tap_outside: true,
+      });
 
-function getGoogleAccounts() {
-  const verifiedAccounts = [
-    { email: '24jr5a0407@gmail.com', name: 'MD Arshad' },
-    { email: 'guardfile@gmail.com', name: 'GuardFile Security Admin' },
-    { email: 'kiddocabspace@gmail.com', name: 'Arshad' },
-  ];
-
-  try {
-    // Check localStorage for previously authenticated Google accounts
-    const stored = localStorage.getItem('guardfile_google_accounts');
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      if (Array.isArray(parsed)) {
-        parsed.forEach(p => {
-          if (p && p.email && !verifiedAccounts.some(a => a.email.toLowerCase() === p.email.toLowerCase())) {
-            verifiedAccounts.push(p);
-          }
+      const btnContainer = document.getElementById('google-gsi-button');
+      if (btnContainer) {
+        google.accounts.id.renderButton(btnContainer, {
+          theme: 'outline',
+          size: 'large',
+          shape: 'pill',
+          width: '100%',
+          text: 'continue_with',
         });
       }
+    } catch (e) {
+      console.warn('Google Identity initialization deferred:', e);
     }
-
-    // Check remembered email from login
-    const remembered = localStorage.getItem('trustvault_remembered_email');
-    if (remembered && !verifiedAccounts.some(a => a.email.toLowerCase() === remembered.toLowerCase())) {
-      verifiedAccounts.unshift({ email: remembered.toLowerCase(), name: remembered.split('@')[0] });
-    }
-
-    // Check last registered email
-    const lastReg = localStorage.getItem('guardfile_last_registered_email');
-    if (lastReg && !verifiedAccounts.some(a => a.email.toLowerCase() === lastReg.toLowerCase())) {
-      verifiedAccounts.unshift({ email: lastReg.toLowerCase(), name: lastReg.split('@')[0] });
-    }
-  } catch (e) {}
-
-  return verifiedAccounts;
+  }
 }
 
-function renderGoogleAccountsList() {
-  const listEl = document.getElementById('google-accounts-list');
-  if (!listEl) return;
-  const accounts = getGoogleAccounts();
-  const colors = ['bg-blue-600', 'bg-purple-600', 'bg-emerald-600', 'bg-amber-600', 'bg-indigo-600'];
+function handleGoogleCredentialResponse(response) {
+  if (!response || !response.credential) return;
+  try {
+    const base64Url = response.credential.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(atob(base64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
+    const payload = JSON.parse(jsonPayload);
 
-  if (accounts.length === 0) {
-    listEl.innerHTML = `<p class="text-xs text-slate-400 text-center py-3">No saved Google accounts yet.</p>`;
-    return;
+    if (payload.email) {
+      executeGoogleAuth(payload.email, payload.name || payload.email.split('@')[0]);
+    }
+  } catch (err) {
+    console.error('Failed to parse Google credential:', err);
+    showToast('Sign-In Error', 'Unable to process Google credential.', 'error');
   }
+}
 
-  listEl.innerHTML = accounts.map((acc, idx) => {
-    const displayName = acc.name || acc.email.split('@')[0];
-    const initials = displayName
-      .split(' ')
-      .map(p => p[0])
-      .join('')
-      .substring(0, 2)
-      .toUpperCase();
-    const color = colors[idx % colors.length];
-
-    return `
-      <button
-        type="button"
-        onclick="executeGoogleAuth('${acc.email}', '${displayName}')"
-        class="w-full p-2.5 rounded-2xl border border-slate-200 hover:border-blue-400 hover:bg-blue-50/40 flex items-center gap-3 transition text-left cursor-pointer group"
-      >
-        <div class="w-8 h-8 rounded-full ${color} text-white font-bold flex items-center justify-center text-xs shadow-xs shrink-0">
-          ${initials}
-        </div>
-        <div class="flex-1 min-w-0">
-          <p class="text-xs font-bold text-slate-900 truncate">${displayName}</p>
-          <p class="text-[11px] text-slate-500 truncate font-mono">${acc.email}</p>
-        </div>
-        <div class="flex items-center gap-1.5 shrink-0">
-          <span class="text-[10px] font-semibold text-blue-600 opacity-0 group-hover:opacity-100 transition">Sign In</span>
-          <i data-lucide="chevron-right" class="w-4 h-4 text-blue-600 opacity-0 group-hover:opacity-100 transition"></i>
-        </div>
-      </button>
-    `;
-  }).join('');
-
-  if (window.lucide) lucide.createIcons();
+function handleGoogleSignIn() {
+  if (typeof google !== 'undefined' && google.accounts && google.accounts.id) {
+    try {
+      google.accounts.id.prompt((notification) => {
+        if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+          openGoogleModal();
+        }
+      });
+      return;
+    } catch (e) {}
+  }
+  openGoogleModal();
 }
 
 function handleGoogleDirectEmailSubmit(e) {
@@ -1126,22 +1097,12 @@ function handleGoogleDirectEmailSubmit(e) {
   const email = emailInput.value.trim().toLowerCase();
   const name = email.split('@')[0];
 
-  // Store in recent Google accounts for future one-click access
-  try {
-    const accounts = getGoogleAccounts();
-    if (!accounts.some(a => a.email.toLowerCase() === email)) {
-      accounts.unshift({ email, name });
-      localStorage.setItem('guardfile_google_accounts', JSON.stringify(accounts.slice(0, 8)));
-    }
-  } catch (err) {}
-
   executeGoogleAuth(email, name);
 }
 
 function openGoogleModal() {
   const modal = document.getElementById('modal-google-auth');
   if (modal) {
-    renderGoogleAccountsList();
     const input = document.getElementById('google-direct-email-input');
     if (input) {
       input.value = '';
@@ -1150,9 +1111,8 @@ function openGoogleModal() {
     modal.classList.remove('hidden');
     modal.style.setProperty('display', 'flex', 'important');
   }
-  try {
-    if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
-  } catch (e) {}
+  if (typeof initGoogleIdentity === 'function') initGoogleIdentity();
+  if (window.lucide) lucide.createIcons();
 }
 
 function closeGoogleModal() {
@@ -1165,7 +1125,7 @@ function closeGoogleModal() {
 
 async function executeGoogleAuth(email, name, phone) {
   closeGoogleModal();
-  showToast('Google OAuth', `Connecting with ${email}...`, 'info');
+  showToast('Connecting', `Authenticating session for ${email}...`, 'info');
 
   try {
     const res = await fetch('/api/auth/google', {
@@ -1180,9 +1140,8 @@ async function executeGoogleAuth(email, name, phone) {
     });
 
     const data = await res.json();
-
     if (!res.ok) {
-      showToast('Google Sign-In Error', data.error || 'Authentication failed', 'error');
+      showToast('Authentication Refused', data.error || 'Failed to authenticate.', 'error');
       return;
     }
 
@@ -1190,15 +1149,6 @@ async function executeGoogleAuth(email, name, phone) {
       handleAccountStatusResponse(data);
       return;
     }
-
-    // Save active Google account to remembered accounts
-    try {
-      const accounts = getGoogleAccounts();
-      if (!accounts.some(a => a.email.toLowerCase() === email.toLowerCase())) {
-        accounts.unshift({ email: email.toLowerCase(), name: (name || email.split('@')[0]).trim() });
-        localStorage.setItem('guardfile_google_accounts', JSON.stringify(accounts.slice(0, 8)));
-      }
-    } catch (e) {}
 
     setToken(data.token);
     currentUser = data.user;
@@ -1209,7 +1159,7 @@ async function executeGoogleAuth(email, name, phone) {
     if (typeof loadDocuments === 'function') loadDocuments();
     if (typeof updateStats === 'function') updateStats();
   } catch (err) {
-    showToast('Google Sign-In Error', err.message, 'error');
+    showToast('Connection Error', err.message, 'error');
   }
 }
 
@@ -1370,8 +1320,71 @@ function stopAdminNotificationPolling() {
 function generateNewAdminCode(userId) {
   const input = document.getElementById(`code-input-${userId}`);
   if (input) {
-    input.value = `TV-${Math.floor(100000 + Math.random() * 900000)}`;
+    input.value = `GF-${Math.floor(100000 + Math.random() * 900000)}`;
     input.focus();
+  }
+}
+
+async function handleAdminDispatchCode(userId, inputId, roleSelectId) {
+  const token = getToken();
+  if (!token) {
+    showToast('Unauthorized', 'Please sign in as Administrator.', 'error');
+    return;
+  }
+
+  const inputEl = document.getElementById(inputId);
+  const roleSelectEl = document.getElementById(roleSelectId);
+  const dispatchBtn = document.getElementById(`dispatch-btn-${userId}`);
+
+  const customCode = inputEl ? inputEl.value.trim().toUpperCase() : '';
+  const assignedRole = roleSelectEl ? roleSelectEl.value : 'viewer';
+
+  if (!customCode) {
+    showToast('Code Missing', 'Please enter or generate an authorization code first.', 'warning');
+    if (inputEl) inputEl.focus();
+    return;
+  }
+
+  const origBtnHtml = dispatchBtn ? dispatchBtn.innerHTML : 'Send Code';
+  if (dispatchBtn) {
+    dispatchBtn.disabled = true;
+    dispatchBtn.innerHTML = '<i data-lucide="loader" class="w-3 h-3 animate-spin"></i> Sending...';
+    if (window.lucide) lucide.createIcons();
+  }
+
+  try {
+    const res = await fetch('/api/auth/admin-dispatch-code', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ userId, customCode, assignedRole }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      showToast('Dispatch Failed', data.error || 'Failed to dispatch code.', 'error');
+      if (dispatchBtn) {
+        dispatchBtn.disabled = false;
+        dispatchBtn.innerHTML = origBtnHtml;
+        if (window.lucide) lucide.createIcons();
+      }
+      return;
+    }
+
+    showToast('Code Dispatched!', data.message || `Code successfully dispatched to user!`, 'success');
+    await loadPendingApprovals();
+    if (typeof loadAllUsers === 'function') await loadAllUsers();
+    if (typeof loadAuditLogs === 'function') loadAuditLogs();
+    if (typeof updateStats === 'function') updateStats();
+  } catch (err) {
+    showToast('Dispatch Error', err.message, 'error');
+    if (dispatchBtn) {
+      dispatchBtn.disabled = false;
+      dispatchBtn.innerHTML = origBtnHtml;
+      if (window.lucide) lucide.createIcons();
+    }
   }
 }
 
@@ -1823,3 +1836,8 @@ async function handleUpdateUserRole(userId, newRole) {
     }
   }
 }
+
+window.generateNewAdminCode = generateNewAdminCode;
+window.handleAdminDispatchCode = handleAdminDispatchCode;
+window.handleUpdateUserRole = handleUpdateUserRole;
+

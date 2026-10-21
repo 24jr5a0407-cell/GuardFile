@@ -1,4 +1,5 @@
 const express = require('express');
+const fs = require('fs');
 const { randomUUID: uuidv4 } = require('crypto');
 const path = require('path');
 const { query } = require('../config/database');
@@ -7,7 +8,7 @@ const { requireRole } = require('../middleware/rbac');
 const { authorizeDocument } = require('../middleware/authorize');
 const { upload, uploadMultiple, validateUploadedFile } = require('../middleware/fileValidator');
 const { validateFileSignature } = require('../utils/magicBytes');
-const { storeFile, getFileStream, deleteFile } = require('../services/storageService');
+const { storeFile, getFileStream, deleteFile, resolveSecurePath } = require('../services/storageService');
 const { recordEvent } = require('../services/auditService');
 
 const router = express.Router();
@@ -37,8 +38,8 @@ router.post(
       const docId = uuidv4();
 
       await query(
-        `INSERT INTO documents (id, title, category, file_path, file_name, file_size, mime_type, file_hash, owner_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+        `INSERT INTO documents (id, title, category, file_path, file_name, file_size, mime_type, file_hash, file_data, owner_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
         [
           docId,
           title.trim(),
@@ -48,6 +49,7 @@ router.post(
           stored.fileSize,
           req.file.mimetype,
           stored.fileHash,
+          req.file.buffer,
           req.user.id,
         ]
       );
@@ -123,8 +125,8 @@ router.post(
         const title = path.parse(file.originalname).name.replace(/[-_]/g, ' ');
 
         await query(
-          `INSERT INTO documents (id, title, category, file_path, file_name, file_size, mime_type, file_hash, owner_id)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+          `INSERT INTO documents (id, title, category, file_path, file_name, file_size, mime_type, file_hash, file_data, owner_id)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
           [
             docId,
             title,
@@ -134,6 +136,7 @@ router.post(
             stored.fileSize,
             validation.detectedType || file.mimetype,
             stored.fileHash,
+            file.buffer,
             req.user.id,
           ]
         );
@@ -319,6 +322,16 @@ router.get('/:id/download', authenticateToken, authorizeDocument('read'), async 
       },
     });
 
+    // Auto-rehydrate file from DB if missing on serverless ephemeral container (e.g. Vercel)
+    const verifiedPath = resolveSecurePath(req.document.file_path);
+    if (!fs.existsSync(verifiedPath)) {
+      const dbRow = await query('SELECT file_data FROM documents WHERE id = $1', [req.document.id]);
+      if (dbRow.rows[0]?.file_data) {
+        fs.mkdirSync(path.dirname(verifiedPath), { recursive: true });
+        fs.writeFileSync(verifiedPath, dbRow.rows[0].file_data);
+      }
+    }
+
     const fileStream = getFileStream(req.document.file_path);
 
     res.setHeader('Content-Type', req.document.mime_type || 'application/octet-stream');
@@ -355,6 +368,16 @@ router.get('/:id/preview', authenticateToken, authorizeDocument('read'), async (
         accessLevel: req.accessLevel,
       },
     });
+
+    // Auto-rehydrate file from DB if missing on serverless ephemeral container (e.g. Vercel)
+    const verifiedPath = resolveSecurePath(req.document.file_path);
+    if (!fs.existsSync(verifiedPath)) {
+      const dbRow = await query('SELECT file_data FROM documents WHERE id = $1', [req.document.id]);
+      if (dbRow.rows[0]?.file_data) {
+        fs.mkdirSync(path.dirname(verifiedPath), { recursive: true });
+        fs.writeFileSync(verifiedPath, dbRow.rows[0].file_data);
+      }
+    }
 
     const fileStream = getFileStream(req.document.file_path);
 
